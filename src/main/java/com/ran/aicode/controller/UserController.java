@@ -5,11 +5,13 @@ import com.ran.aicode.annotation.AuthCheck;
 import com.ran.aicode.common.BaseResponse;
 import com.ran.aicode.common.ResultUtils;
 import com.ran.aicode.constant.UserConstant;
+import com.ran.aicode.exception.BusinessException;
 import com.ran.aicode.exception.ErrorCode;
 import com.ran.aicode.exception.ThrowUtils;
 import com.ran.aicode.model.dto.UserAddRequest;
 import com.ran.aicode.model.dto.UserLoginRequest;
 import com.ran.aicode.model.dto.UserRegisterRequest;
+import com.ran.aicode.model.dto.UserUpdateRequest;
 import com.ran.aicode.model.entity.User;
 import com.ran.aicode.model.vo.LoginUserVO;
 import com.ran.aicode.service.UserService;
@@ -85,6 +87,21 @@ public class UserController {
         ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR);
         return ResultUtils.success(user.getId());
     }
+
+    /**
+     * 根据 id 获取用户（仅管理员）
+     */
+    @GetMapping("/get")
+    @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
+    public BaseResponse<User> getUserById(long id) {
+        ThrowUtils.throwIf(id <= 0, ErrorCode.PARAMS_ERROR);
+        User user = userService.getById(id);
+        ThrowUtils.throwIf(user == null, ErrorCode.NOT_FOUND_ERROR);
+        return ResultUtils.success(user);
+    }
+
+
+
 
     /**
      * 根据主键删除用户。
