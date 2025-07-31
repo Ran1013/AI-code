@@ -1,8 +1,10 @@
 package com.ran.aicode.service;
 
+import com.ran.aicode.model.dto.UserQueryRequest;
 import com.ran.aicode.model.entity.User;
 import com.ran.aicode.model.vo.LoginUserVO;
 import com.ran.aicode.model.vo.UserVO;
+import com.mybatisflex.core.query.QueryWrapper;
 import com.mybatisflex.core.service.IService;
 import jakarta.servlet.http.HttpServletRequest;
 
@@ -64,4 +66,6 @@ public interface UserService extends IService<User> {
     public UserVO getUserVO(User user);
 
     public List<UserVO> getUserVOList(List<User> userList);
+
+    public QueryWrapper getQueryWrapper(UserQueryRequest userQueryRequest);
 }
