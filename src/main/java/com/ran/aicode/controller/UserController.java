@@ -1,9 +1,13 @@
 package com.ran.aicode.controller;
 
+import cn.hutool.core.bean.BeanUtil;
+import com.ran.aicode.annotation.AuthCheck;
 import com.ran.aicode.common.BaseResponse;
 import com.ran.aicode.common.ResultUtils;
+import com.ran.aicode.constant.UserConstant;
 import com.ran.aicode.exception.ErrorCode;
 import com.ran.aicode.exception.ThrowUtils;
+import com.ran.aicode.model.dto.UserAddRequest;
 import com.ran.aicode.model.dto.UserLoginRequest;
 import com.ran.aicode.model.dto.UserRegisterRequest;
 import com.ran.aicode.model.entity.User;
@@ -65,14 +69,21 @@ public class UserController {
     }
 
     /**
-     * 保存用户。
-     *
-     * @param user 用户
-     * @return {@code true} 保存成功，{@code false} 保存失败
+     * 创建用户
      */
-    @PostMapping("save")
-    public boolean save(@RequestBody User user) {
-        return userService.save(user);
+    @PostMapping("/add")
+    @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
+    public BaseResponse<Long> addUser(@RequestBody UserAddRequest userAddRequest) {
+        ThrowUtils.throwIf(userAddRequest == null, ErrorCode.PARAMS_ERROR);
+        User user = new User();
+        BeanUtil.copyProperties(userAddRequest, user);
+        // 默认密码 12345678
+        final String DEFAULT_PASSWORD = "12345678";
+        String encryptPassword = userService.getEncryptPassword(DEFAULT_PASSWORD);
+        user.setUserPassword(encryptPassword);
+        boolean result = userService.save(user);
+        ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR);
+        return ResultUtils.success(user.getId());
     }
 
     /**
