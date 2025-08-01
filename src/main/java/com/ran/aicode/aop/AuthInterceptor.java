@@ -3,7 +3,7 @@ package com.ran.aicode.aop;
 import com.ran.aicode.annotation.AuthCheck;
 import com.ran.aicode.exception.BusinessException;
 import com.ran.aicode.exception.ErrorCode;
-import com.ran.aicode.model.UserRoleEnum;
+import com.ran.aicode.model.enums.UserRoleEnum;
 import com.ran.aicode.model.entity.User;
 import com.ran.aicode.service.UserService;
 import jakarta.annotation.Resource;

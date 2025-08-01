@@ -5,7 +5,7 @@ import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.util.StrUtil;
 import com.ran.aicode.exception.BusinessException;
 import com.ran.aicode.exception.ErrorCode;
-import com.ran.aicode.model.UserRoleEnum;
+import com.ran.aicode.model.enums.UserRoleEnum;
 import com.ran.aicode.model.dto.UserQueryRequest;
 import com.ran.aicode.model.entity.User;
 import com.ran.aicode.mapper.UserMapper;

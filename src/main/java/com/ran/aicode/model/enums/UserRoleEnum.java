@@ -1,4 +1,4 @@
-package com.ran.aicode.model;
+package com.ran.aicode.model.enums;
 
 import cn.hutool.core.util.ObjUtil;
 import lombok.Getter;
