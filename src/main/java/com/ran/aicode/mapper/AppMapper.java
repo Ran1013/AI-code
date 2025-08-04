@@ -1,6 +1,5 @@
 package com.ran.aicode.mapper;
 
-
 import com.ran.aicode.model.entity.App;
 import com.mybatisflex.core.BaseMapper;
 
