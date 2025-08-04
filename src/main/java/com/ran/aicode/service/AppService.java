@@ -2,9 +2,11 @@ package com.ran.aicode.service;
 
 import com.ran.aicode.model.dto.AppQueryRequest;
 import com.ran.aicode.model.entity.App;
+import com.ran.aicode.model.entity.User;
 import com.ran.aicode.model.vo.AppVO;
 import com.mybatisflex.core.query.QueryWrapper;
 import com.mybatisflex.core.service.IService;
+import reactor.core.publisher.Flux;
 
 import java.util.List;
 
@@ -47,4 +49,14 @@ public interface AppService extends IService<App> {
      * @return 是否有权限
      */
     boolean validateUserPermission(Long appId, Long userId);
+
+    /**
+     * 应用聊天生成代码（流式 SSE）
+     *
+     * @param appId   应用 ID
+     * @param message 用户消息
+     * @param loginUser 请求对象
+     * @return 生成结果流
+     */
+    public Flux<String> chatToGenCode(Long appId, String message, User loginUser);
 }
