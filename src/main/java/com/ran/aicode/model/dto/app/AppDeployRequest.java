@@ -1,4 +1,4 @@
-package com.ran.aicode.model.dto;
+package com.ran.aicode.model.dto.app;
 
 import lombok.Data;
 

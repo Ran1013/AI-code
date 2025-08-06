@@ -1,4 +1,4 @@
-package com.ran.aicode.model.dto;
+package com.ran.aicode.model.dto.app;
 
 import com.ran.aicode.common.PageRequest;
 import lombok.Data;

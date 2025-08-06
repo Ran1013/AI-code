@@ -1,6 +1,6 @@
 package com.ran.aicode.service;
 
-import com.ran.aicode.model.dto.UserQueryRequest;
+import com.ran.aicode.model.dto.user.UserQueryRequest;
 import com.ran.aicode.model.entity.User;
 import com.ran.aicode.model.vo.LoginUserVO;
 import com.ran.aicode.model.vo.UserVO;

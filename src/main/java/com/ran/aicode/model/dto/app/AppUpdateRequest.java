@@ -1,16 +1,21 @@
-package com.ran.aicode.model.dto;
+package com.ran.aicode.model.dto.app;
 
 import lombok.Data;
 
 import java.io.Serializable;
 
 /**
- * 应用添加请求
+ * 应用更新请求
  *
  * @author <a>ran</a>
  */
 @Data
-public class AppAddRequest implements Serializable {
+public class AppUpdateRequest implements Serializable {
+
+    /**
+     * id
+     */
+    private Long id;
 
     /**
      * 应用名称
@@ -23,14 +28,9 @@ public class AppAddRequest implements Serializable {
     private String cover;
 
     /**
-     * 应用初始化的 prompt
+     * 优先级
      */
-    private String initPrompt;
-
-    /**
-     * 代码生成类型（枚举）
-     */
-    private String codeGenType;
+    private Integer priority;
 
     private static final long serialVersionUID = 1L;
 } 

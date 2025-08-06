@@ -9,7 +9,7 @@ import com.ran.aicode.constant.UserConstant;
 import com.ran.aicode.exception.BusinessException;
 import com.ran.aicode.exception.ErrorCode;
 import com.ran.aicode.exception.ThrowUtils;
-import com.ran.aicode.model.dto.*;
+import com.ran.aicode.model.dto.user.*;
 import com.ran.aicode.model.entity.User;
 import com.ran.aicode.model.vo.LoginUserVO;
 import com.ran.aicode.model.vo.UserVO;
