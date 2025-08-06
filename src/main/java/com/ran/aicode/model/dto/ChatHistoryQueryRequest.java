@@ -1,6 +1,8 @@
 package com.ran.aicode.model.dto;
 
 import com.ran.aicode.common.PageRequest;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
@@ -14,6 +16,7 @@ public class ChatHistoryQueryRequest extends PageRequest implements Serializable
     /**
      * id
      */
+    @JsonSerialize(using = ToStringSerializer.class)
     private Long id;
 
     /**
