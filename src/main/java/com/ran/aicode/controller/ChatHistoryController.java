@@ -4,21 +4,17 @@ import com.ran.aicode.annotation.AuthCheck;
 import com.ran.aicode.common.BaseResponse;
 import com.ran.aicode.common.ResultUtils;
 import com.ran.aicode.constant.UserConstant;
-import com.ran.aicode.exception.ErrorCode;
-import com.ran.aicode.exception.ThrowUtils;
+
 import com.ran.aicode.model.dto.ChatHistoryQueryRequest;
-import com.ran.aicode.model.entity.ChatHistory;
 import com.ran.aicode.model.entity.User;
+import com.ran.aicode.model.vo.ChatHistoryVO;
 import com.ran.aicode.service.ChatHistoryService;
 import com.mybatisflex.core.paginate.Page;
-import com.mybatisflex.core.query.QueryWrapper;
-import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.beans.factory.annotation.Autowired;
+import jakarta.annotation.Resource;
 import com.ran.aicode.service.UserService;
 import java.time.LocalDateTime;
-import java.util.List;
 
 /**
  * 对话历史 控制层。
@@ -29,7 +25,7 @@ import java.util.List;
 @RequestMapping("/chatHistory")
 public class ChatHistoryController {
 
-    @Autowired
+    @Resource
     private ChatHistoryService chatHistoryService;
 
     @Resource
@@ -45,12 +41,12 @@ public class ChatHistoryController {
      * @return 对话历史分页
      */
     @GetMapping("/app/{appId}")
-    public BaseResponse<Page<ChatHistory>> listAppChatHistory(@PathVariable Long appId,
+    public BaseResponse<Page<ChatHistoryVO>> listAppChatHistory(@PathVariable Long appId,
                                                               @RequestParam(defaultValue = "10") int pageSize,
                                                               @RequestParam(required = false) LocalDateTime lastCreateTime,
                                                               HttpServletRequest request) {
         User loginUser = userService.getLoginUser(request);
-        Page<ChatHistory> result = chatHistoryService.listAppChatHistoryByPage(appId, pageSize, lastCreateTime, loginUser);
+        Page<ChatHistoryVO> result = chatHistoryService.listAppChatHistoryVOByPage(appId, pageSize, lastCreateTime, loginUser);
         return ResultUtils.success(result);
     }
 
@@ -62,13 +58,8 @@ public class ChatHistoryController {
      */
     @PostMapping("/admin/list/page/vo")
     @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
-    public BaseResponse<Page<ChatHistory>> listAllChatHistoryByPageForAdmin(@RequestBody ChatHistoryQueryRequest chatHistoryQueryRequest) {
-        ThrowUtils.throwIf(chatHistoryQueryRequest == null, ErrorCode.PARAMS_ERROR);
-        long pageNum = chatHistoryQueryRequest.getPageNum();
-        long pageSize = chatHistoryQueryRequest.getPageSize();
-        // 查询数据
-        QueryWrapper queryWrapper = chatHistoryService.getQueryWrapper(chatHistoryQueryRequest);
-        Page<ChatHistory> result = chatHistoryService.page(Page.of(pageNum, pageSize), queryWrapper);
+    public BaseResponse<Page<ChatHistoryVO>> listAllChatHistoryByPageForAdmin(@RequestBody ChatHistoryQueryRequest chatHistoryQueryRequest) {
+        Page<ChatHistoryVO> result = chatHistoryService.listAllChatHistoryVOByPageForAdmin(chatHistoryQueryRequest);
         return ResultUtils.success(result);
     }
 
