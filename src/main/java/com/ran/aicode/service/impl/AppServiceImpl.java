@@ -12,6 +12,7 @@ import com.ran.aicode.core.hander.StreamHandlerExecutor;
 import com.ran.aicode.exception.BusinessException;
 import com.ran.aicode.exception.ErrorCode;
 import com.ran.aicode.exception.ThrowUtils;
+import com.ran.aicode.model.dto.app.AppAddRequest;
 import com.ran.aicode.model.dto.app.AppQueryRequest;
 import com.ran.aicode.model.entity.App;
 import com.ran.aicode.mapper.AppMapper;
@@ -19,15 +20,15 @@ import com.ran.aicode.model.entity.User;
 import com.ran.aicode.model.enums.ChatHistoryMessageTypeEnum;
 import com.ran.aicode.model.enums.CodeGenTypeEnum;
 import com.ran.aicode.model.vo.AppVO;
-import com.ran.aicode.service.AppService;
-import com.ran.aicode.service.AppUserService;
-import com.ran.aicode.service.ChatHistoryService;
-import com.ran.aicode.service.ScreenshotService;
+import com.ran.aicode.service.*;
 import com.mybatisflex.core.query.QueryWrapper;
 import com.mybatisflex.spring.service.impl.ServiceImpl;
 import jakarta.annotation.Resource;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import reactor.core.publisher.Flux;
 
 import java.io.File;
@@ -172,6 +173,17 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
             boolean updated = this.updateById(updateApp);
             ThrowUtils.throwIf(!updated, ErrorCode.OPERATION_ERROR, "更新应用封面字段失败");
         });
+    }
+    @Autowired
+    private AppMapper appMapper;
+
+    @Override
+    @Transactional
+    public String addApp(App app,Long userId) {
+        int result = appMapper.insert(app);
+        appUserService.inviteUserToApp(app.getId(), userId,1);
+        ThrowUtils.throwIf(result != 1, ErrorCode.OPERATION_ERROR);
+        return String.valueOf(app.getId());
     }
 
     @Override

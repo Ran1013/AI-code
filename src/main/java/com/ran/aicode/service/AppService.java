@@ -1,11 +1,15 @@
 package com.ran.aicode.service;
 
+import com.ran.aicode.common.BaseResponse;
+import com.ran.aicode.model.dto.app.AppAddRequest;
 import com.ran.aicode.model.dto.app.AppQueryRequest;
 import com.ran.aicode.model.entity.App;
 import com.ran.aicode.model.entity.User;
 import com.ran.aicode.model.vo.AppVO;
 import com.mybatisflex.core.query.QueryWrapper;
 import com.mybatisflex.core.service.IService;
+import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.web.bind.annotation.RequestBody;
 import reactor.core.publisher.Flux;
 
 import java.util.List;
@@ -79,4 +83,11 @@ public interface AppService extends IService<App> {
      */
     void generateAppScreenshotAsync(Long appId, String appUrl);
 
+    /**
+     * 创建app
+     * @param app 应用ID
+     * @param userId 用户ID
+     * @return
+     */
+    String addApp(App app,Long userId);
 }
