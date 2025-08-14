@@ -1,15 +1,14 @@
 package com.ran.aicode.controller;
 
+import cn.dev33.satoken.annotation.SaCheckRole;
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.json.JSONUtil;
-import com.ran.aicode.annotation.AuthCheck;
 import com.ran.aicode.common.BaseResponse;
 import com.ran.aicode.common.DeleteRequest;
 import com.ran.aicode.common.ResultUtils;
 import com.ran.aicode.constant.AppConstant;
 import com.ran.aicode.constant.UserConstant;
 import com.ran.aicode.core.AiCodeGeneratorFacade;
-import com.ran.aicode.exception.BusinessException;
 import com.ran.aicode.exception.ErrorCode;
 import com.ran.aicode.exception.ThrowUtils;
 import com.ran.aicode.manager.auth.AppUserAuthManager;
@@ -283,7 +282,7 @@ public class AppController {
      * @return 删除结果
      */
     @PostMapping("/delete")
-    @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
+    @SaCheckRole(UserConstant.ADMIN_ROLE)
     public BaseResponse<Boolean> deleteApp(@RequestBody DeleteRequest deleteRequest) {
         ThrowUtils.throwIf(deleteRequest == null || deleteRequest.getId() <= 0, ErrorCode.PARAMS_ERROR);
         boolean result = appService.deleteApp(deleteRequest.getId());
@@ -298,7 +297,7 @@ public class AppController {
      * @return 更新结果
      */
     @PostMapping("/update")
-    @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
+    @SaCheckRole(UserConstant.ADMIN_ROLE)
     public BaseResponse<Boolean> updateApp(@RequestBody AppUpdateRequest appUpdateRequest) {
         ThrowUtils.throwIf(appUpdateRequest == null || appUpdateRequest.getId() == null, ErrorCode.PARAMS_ERROR);
         // 验证应用名称长度不超过10个字
@@ -325,7 +324,7 @@ public class AppController {
      * @return 应用列表
      */
     @PostMapping("/list/page")
-    @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
+    @SaCheckRole(UserConstant.ADMIN_ROLE)
     public BaseResponse<Page<AppVO>> listAppByPage(@RequestBody AppQueryRequest appQueryRequest) {
         ThrowUtils.throwIf(appQueryRequest == null, ErrorCode.PARAMS_ERROR);
         
@@ -347,7 +346,8 @@ public class AppController {
      * @return 应用详情
      */
     @GetMapping("/get/admin")
-    @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
+//    @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
+    @SaCheckRole(UserConstant.ADMIN_ROLE)
     public BaseResponse<App> getAppByIdAdmin(long id) {
         ThrowUtils.throwIf(id <= 0, ErrorCode.PARAMS_ERROR);
         App app = appService.getById(id);
