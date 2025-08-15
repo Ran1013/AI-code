@@ -24,6 +24,8 @@ import com.ran.aicode.model.enums.AppRoleEnum;
 import com.ran.aicode.model.enums.AppTypeEnum;
 import com.ran.aicode.model.enums.UserRoleEnum;
 import com.ran.aicode.model.vo.AppVO;
+import com.ran.aicode.ratelimit.annotation.RateLimit;
+import com.ran.aicode.ratelimit.enums.RateLimitType;
 import com.ran.aicode.service.AppService;
 import com.ran.aicode.service.ProjectDownloadService;
 import com.ran.aicode.service.UserService;
@@ -74,6 +76,7 @@ public class AppController {
      */
     @GetMapping(value = "/chat/code", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     @SaSpaceCheckPermission(value = AppUserPermissionConstant.APP_EDIT)
+    @RateLimit(limitType = RateLimitType.USER, rate = 7, rateInterval = 60, message = "AI 对话请求过于频繁，请稍后再试")
     public Flux<ServerSentEvent<String>> chatToGenCode(@RequestParam Long appId,
                                                        @RequestParam String message,
                                                        @RequestParam(required = false) List<String> image,
