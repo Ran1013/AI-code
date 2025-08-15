@@ -8,7 +8,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 /**
- * 空间角色枚举
+ * 角色枚举
  */
 @Getter
 public enum AppRoleEnum {
