@@ -2,6 +2,7 @@ package com.ran.aicode.model.vo;
 
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
+import com.mybatisflex.annotation.Column;
 import lombok.Data;
 
 import java.io.Serializable;
@@ -83,6 +84,11 @@ public class AppVO implements Serializable {
      * 更新时间
      */
     private LocalDateTime updateTime;
+
+    /**
+     * 点赞数
+     */
+    private Integer thumbCount;
 
     /**
      * 权限列表
