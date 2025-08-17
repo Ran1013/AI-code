@@ -1,6 +1,7 @@
 package com.ran.aicode.controller;
 
 import cn.dev33.satoken.annotation.SaCheckRole;
+import com.ran.aicode.annotation.HotKeyCache;
 import com.ran.aicode.common.BaseResponse;
 import com.ran.aicode.common.ResultUtils;
 import com.ran.aicode.constant.UserConstant;
