@@ -1,4 +1,4 @@
-package com.ran.aicode.config;
+package com.ran.aicode.hotkey;
 
 import com.jd.platform.hotkey.client.ClientStarter;
 import lombok.Data;

@@ -1,4 +1,4 @@
-package com.ran.aicode.annotation;
+package com.ran.aicode.hotkey.annotation;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
