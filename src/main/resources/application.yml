@@ -26,6 +26,8 @@ spring:
     port: 465
     username: your-qq-email@qq.com
     password: <YOUR_EMAIL_SMTP_PASSWORD>
+    from: your-qq-email@qq.com
+    fromName: AI代码生成平台
     properties:
       mail:
         smtp:
