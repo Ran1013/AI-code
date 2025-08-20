@@ -2,6 +2,7 @@ package com.ran.aicode.controller;
 
 import cn.dev33.satoken.annotation.SaCheckLogin;
 import cn.dev33.satoken.annotation.SaCheckRole;
+import cn.dev33.satoken.stp.StpUtil;
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.util.StrUtil;
 import com.ran.aicode.common.BaseResponse;
@@ -178,6 +179,8 @@ public class UserController {
         BeanUtil.copyProperties(userUpdateRequest, user);
         boolean result = userService.updateById(user);
         ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR);
+        StpUtil.checkLogin();
+        StpUtil.logout();
         return ResultUtils.success(true);
     }
     /**
