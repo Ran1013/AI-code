@@ -56,37 +56,46 @@ knife4j:
 langchain4j:
   open-ai:
     chat-model:
-      base-url: https://api.deepseek.com
-      api-key: <Your API Key>
-      model-name: deepseek-chat
+      base-url: https://api.siliconflow.cn/v1/chat/completions
+      api-key: <YOUR_SILICONFLOW_API_KEY>
+      model-name: deepseek-ai/DeepSeek-V3.1
       log-requests: true
       log-responses: true
     # 推理 AI 模型配置（用于复杂的推理任务）
     reasoning-streaming-chat-model:
-      base-url: https://api.deepseek.com
-      api-key: <Your API Key>
-      model-name: deepseek-reasoner
+      base-url: https://api.siliconflow.cn/v1/chat/completions
+      api-key: <YOUR_SILICONFLOW_API_KEY>
+      model-name: Pro/deepseek-ai/DeepSeek-V3.1
       max-tokens: 32768
       temperature: 0.1
       log-requests: true
       log-responses: true
     # 智能路由 AI 模型配置（用于简单的分类任务）
     routing-chat-model:
-      base-url: https://api.deepseek.com
-      api-key: <Your API Key>
-      model-name: deepseek-chat
+      base-url: https://dashscope.aliyuncs.com/compatible-mode/v1
+      api-key: <YOUR_DASHSCOPE_API_KEY>
+      model-name: qwen-turbo
       log-requests: true
       log-responses: true
 
 
 # 添加 COS 对象存储配置（需要从腾讯云获取）
-cos:
+#cos:
+#  client:
+#    host: your-custom-domain.com
+#    secretId: your-secret-id
+#    secretKey: your-secret-key
+#    region: ap-shanghai
+#    bucket: your-bucket-name
+
+# 添加 OBS 对象存储配置（需要从华为云获取）
+obs:
   client:
-    host: your-custom-domain.com
-    secretId: your-secret-id
-    secretKey: your-secret-key
-    region: ap-shanghai
-    bucket: your-bucket-name
+    endpoint:  https://obs.cn-north-4.myhuaweicloud.com  # 华为云OBS endpoint，如https://obs.cn-north-4.myhuaweicloud.com
+    accessKey: <YOUR_OBS_ACCESS_KEY>    # 华为云访问密钥AK
+    secretKey: <YOUR_OBS_SECRET_KEY>    # 华为云访问密钥SK
+    bucket: your-obs-bucket      # OBS桶名
+    region: cn-north-4           # 区域，如cn-north-4
 
 # Sa-Token 配置
 sa-token:
