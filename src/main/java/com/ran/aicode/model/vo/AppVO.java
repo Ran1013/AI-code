@@ -2,7 +2,6 @@ package com.ran.aicode.model.vo;
 
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
-import com.mybatisflex.annotation.Column;
 import lombok.Data;
 
 import java.io.Serializable;

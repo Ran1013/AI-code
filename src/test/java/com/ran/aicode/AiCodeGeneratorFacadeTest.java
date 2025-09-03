@@ -1,13 +1,8 @@
 package com.ran.aicode;
 
 import com.ran.aicode.core.AiCodeGeneratorFacade;
-import com.ran.aicode.model.enums.CodeGenTypeEnum;
 import jakarta.annotation.Resource;
-import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
-
-import java.io.File;
 
 @SpringBootTest
 class AiCodeGeneratorFacadeTest {

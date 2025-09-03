@@ -1,15 +1,11 @@
 package com.ran.aicode.service;
 
 
-import com.ran.aicode.common.PageRequest;
 import com.ran.aicode.model.entity.Thumb;
-import com.ran.aicode.model.vo.AppThumbDetailVO;
 import com.ran.aicode.model.vo.AppThumbVO;
-import com.mybatisflex.core.paginate.Page;
 import com.mybatisflex.core.service.IService;
 
 import java.util.List;
-import java.util.Set;
 
 /**
  * 点赞与排行榜 服务层。

@@ -1,14 +1,11 @@
 package com.ran.aicode.core.hander;
 
-import cn.hutool.core.io.FileUtil;
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.json.JSONObject;
 import cn.hutool.json.JSONUtil;
 import com.ran.aicode.ai.model.message.*;
 import com.ran.aicode.ai.tools.BaseTool;
 import com.ran.aicode.ai.tools.ToolManager;
-import com.ran.aicode.constant.AppConstant;
-import com.ran.aicode.core.builder.VueProjectBuilder;
 import com.ran.aicode.model.entity.User;
 import com.ran.aicode.model.enums.ChatHistoryMessageTypeEnum;
 import com.ran.aicode.model.enums.ChatHistoryStatusEnum;

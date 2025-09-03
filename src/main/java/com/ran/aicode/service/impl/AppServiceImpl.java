@@ -42,9 +42,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
-import com.ran.aicode.model.vo.AppThumbDetailVO;
-import com.ran.aicode.service.ThumbService;
-
 /**
  * 应用 服务层实现。
  *

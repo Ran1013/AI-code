@@ -2,8 +2,6 @@ package com.ran.aicode.controller;
 
 import cn.dev33.satoken.annotation.SaCheckLogin;
 import com.ran.aicode.constant.AppConstant;
-import com.ran.aicode.manager.auth.annotation.SaSpaceCheckPermission;
-import com.ran.aicode.manager.auth.model.AppUserPermissionConstant;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;

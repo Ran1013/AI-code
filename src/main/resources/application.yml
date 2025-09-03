@@ -1,112 +1,111 @@
+# ===================================================================
+#                      基础通用 (Base) 配置
+# ===================================================================
 spring:
   application:
     name: ai-code-backend
   profiles:
-    active: local
+    # 在这里切换环境 (prod, dev, local)
+    active: prod
 
-  # mysql
-  datasource:
-    driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://localhost:3306/ai_code
-    username: root
-    password: ${DB_PASSWORD:password}
-  #redis
+  # redis
   data:
     redis:
-      host: localhost
-      port: 6379
-      password:
       database: 0
       ttl: 3600
-  session:
-    store-type: redis
-    timeout: 259200
+      timeout: 5000ms
+      client-type: jedis
+      jedis:
+        pool:
+          max-active: 8
+          max-wait: 5000ms
+          max-idle: 4
+          min-idle: 0
+          time-between-eviction-runs: -1
+          min-evictable-idle-time: 60000ms
+          block-when-exhausted: false
+          jmx-enabled: false
+          test-on-borrow: false
+          test-while-idle: false
+
+  # 邮箱通用配置
   mail:
-    host: smtp.qq.com
-    port: 465
-    username: your-qq-email@qq.com
-    password: <YOUR_EMAIL_SMTP_PASSWORD>
-    from: your-qq-email@qq.com
-    fromName: AI代码生成平台
+    host: smtp.163.com
     properties:
       mail:
         smtp:
-          auth: true
           ssl:
             enable: true
+  # session 配置
+  session:
+    store-type: redis
+    timeout: 2592000
+
 server:
-  port: 8123
   servlet:
-    context-path: /api
+    context-path: /example
     session:
       cookie:
-        max-age: 259200
+        max-age: 2592000
+
 # springdoc-openapi
 springdoc:
   group-configs:
     - group: 'default'
       paths-to-match: '/**'
       packages-to-scan: com.ran.aicode.controller
-# knife4j
+
+# 接口文档配置
 knife4j:
-  enable: true
   setting:
     language: zh_cn
+  basic:
+    username: root
+    password: 868686
+
 # AI
 langchain4j:
   open-ai:
     chat-model:
-      base-url: https://api.deepseek.com
-      api-key: <Your API Key>
-      model-name: deepseek-chat
-      log-requests: true
-      log-responses: true
-    # 推理 AI 模型配置（用于复杂的推理任务）
+      base-url: https://api.siliconflow.cn/v1/chat/completions
+      model-name: deepseek-ai/DeepSeek-V3.1
+      max-tokens: 8192
+    streaming-chat-model:
+      base-url: https://api.siliconflow.cn/v1/chat/completions
+      model-name: deepseek-ai/DeepSeek-V3.1
+      max-tokens: 8192
     reasoning-streaming-chat-model:
-      base-url: https://api.deepseek.com
-      api-key: <Your API Key>
-      model-name: deepseek-reasoner
+      base-url: https://api.siliconflow.cn/v1/chat/completions
+      model-name: Pro/deepseek-ai/DeepSeek-V3.1
       max-tokens: 32768
       temperature: 0.1
-      log-requests: true
-      log-responses: true
-    # 智能路由 AI 模型配置（用于简单的分类任务）
     routing-chat-model:
-      base-url: https://api.deepseek.com
-      api-key: <Your API Key>
-      model-name: deepseek-chat
-      log-requests: true
-      log-responses: true
+      base-url: https://dashscope.aliyuncs.com/compatible-mode/v1
+      model-name: qwen-turbo
+      max-tokens: 100
 
-
-# 添加 COS 对象存储配置（需要从腾讯云获取）
-cos:
+# 华为云 OBS 对象存储配置
+obs:
   client:
-    host: your-custom-domain.com
-    secretId: your-secret-id
-    secretKey: your-secret-key
-    region: ap-shanghai
-    bucket: your-bucket-name
+    endpoint: obs.cn-north-4.myhuaweicloud.com
+    bucket: your-obs-bucket
 
 # Sa-Token 配置
 sa-token:
-  # token 名称（同时也是 cookie 名称）
-  token-name: ran-ai-code
-  # token 有效期（单位：秒） 默认30天，-1 代表永久有效
+  token-name: ai-code-token
   timeout: 2592000
-  # token 最低活跃频率（单位：秒），如果 token 超过此时间没有访问系统就会被冻结，默认-1 代表不限制，永不冻结
   active-timeout: -1
-  # 是否允许同一账号多地同时登录（为 true 时允许一起登录, 为 false 时新登录挤掉旧登录）
   is-concurrent: true
-  # 在多人登录同一账号时，是否共用一个 token （为 true 时所有登录共用一个 token, 为 false 时每次登录新建一个 token）
   is-share: false
-  # token 风格（默认可取值：uuid、simple-uuid、random-32、random-64、random-128、tik）
   token-style: uuid
-  # 是否输出操作日志
   is-log: true
+
+# 阿里云 DashScope 配置
+dashscope:
+  image-model: wan2.2-t2i-flash
+
 # 热 key 探测
 hotkey:
-  app-name: ranAi
+  app-name: Ai-codegen
   caffeine-size: 10000
   push-period: 1000
-  etcd-server: http://localhost:2379

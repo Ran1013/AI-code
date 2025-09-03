@@ -1,9 +1,6 @@
 package com.ran.aicode.service.impl;
 
 
-import com.ran.aicode.common.PageRequest;
-import com.ran.aicode.constant.ThumbConstant;
-import com.ran.aicode.hotkey.annotation.HotKeyCache;
 import com.ran.aicode.mapper.ThumbMapper;
 import com.ran.aicode.model.entity.App;
 import com.ran.aicode.model.entity.Thumb;
@@ -12,14 +9,9 @@ import com.ran.aicode.service.AppService;
 import com.ran.aicode.service.ThumbService;
 import com.ran.aicode.utils.ThumbHotKeyUtil;
 import com.ran.aicode.utils.RedisKeyUtil;
-import com.mybatisflex.core.paginate.Page;
-import com.mybatisflex.core.query.QueryWrapper;
 import com.mybatisflex.spring.service.impl.ServiceImpl;
 import jakarta.annotation.Resource;
-import org.springframework.beans.factory.annotation.Autowired;
-import com.jd.platform.hotkey.client.callback.JdHotKeyStore;
 import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,7 +21,6 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Set;
-import java.util.concurrent.CompletableFuture;
 
 import lombok.extern.slf4j.Slf4j;
 

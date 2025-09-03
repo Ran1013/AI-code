@@ -4,14 +4,9 @@ import com.ran.aicode.ai.model.HtmlCodeResult;
 import com.ran.aicode.ai.model.MultiFileCodeResult;
 import com.ran.aicode.core.AiCodeGeneratorFacade;
 import com.ran.aicode.core.CodeParser;
-import com.ran.aicode.model.enums.CodeGenTypeEnum;
 import jakarta.annotation.Resource;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
-import reactor.core.publisher.Flux;
-
-import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 @SpringBootTest

@@ -2,8 +2,6 @@ package com.ran.aicode.websocket.model;
 
 import com.ran.aicode.model.vo.UserVO;
 import lombok.Data;
-import org.springframework.http.codec.ServerSentEvent;
-import reactor.core.publisher.Flux;
 
 @Data
 public class AppResponseMessage {

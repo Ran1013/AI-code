@@ -1,8 +1,5 @@
 package com.ran.aicode.service.impl;
 
-import cn.hutool.core.bean.BeanUtil;
-import cn.hutool.core.collection.CollUtil;
-import com.ran.aicode.constant.UserConstant;
 import com.ran.aicode.exception.BusinessException;
 import com.ran.aicode.exception.ErrorCode;
 import com.ran.aicode.model.entity.App;
@@ -10,8 +7,6 @@ import com.ran.aicode.model.entity.AppUser;
 import com.ran.aicode.model.entity.User;
 import com.ran.aicode.mapper.AppUserMapper;
 import com.ran.aicode.model.enums.AppRoleEnum;
-import com.ran.aicode.model.enums.AppTypeEnum;
-import com.ran.aicode.model.enums.UserRoleEnum;
 import com.ran.aicode.model.vo.AppTeamMemberVO;
 import com.ran.aicode.manager.auth.AppUserAuthManager;
 import com.ran.aicode.service.AppService;
@@ -27,7 +22,6 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.transaction.annotation.Transactional;

@@ -1,7 +1,5 @@
 package com.ran.aicode.service;
 
-import com.ran.aicode.common.BaseResponse;
-
 /**
  * 验证码服务。
  *

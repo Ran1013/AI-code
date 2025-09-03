@@ -1,6 +1,5 @@
 package com.ran.aicode.config;
 
-import cn.hutool.extra.servlet.JakartaServletUtil;
 import cn.hutool.http.ContentType;
 import cn.hutool.http.Header;
 import jakarta.servlet.*;

@@ -30,7 +30,6 @@ import com.ran.aicode.ratelimit.enums.RateLimitType;
 import com.ran.aicode.service.AppService;
 import com.ran.aicode.service.ProjectDownloadService;
 import com.ran.aicode.service.UserService;
-import com.jd.platform.hotkey.client.callback.JdHotKeyStore;
 import com.mybatisflex.core.paginate.Page;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
@@ -47,8 +46,6 @@ import java.io.File;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
-
-import static com.ran.aicode.constant.ThumbConstant.APP_ID_HOTKEY_PREFIX;
 
 /**
  * 应用 控制层。

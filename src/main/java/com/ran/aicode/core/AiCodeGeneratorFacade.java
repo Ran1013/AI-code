@@ -4,8 +4,6 @@ import cn.hutool.json.JSONUtil;
 import com.ran.aicode.ai.AiCodeGeneratorService;
 import com.ran.aicode.ai.AiCodeGeneratorServiceFactory;
 import com.ran.aicode.ai.GenerationTaskManager;
-import com.ran.aicode.ai.model.HtmlCodeResult;
-import com.ran.aicode.ai.model.MultiFileCodeResult;
 import com.ran.aicode.ai.model.message.AiResponseMessage;
 import com.ran.aicode.ai.model.message.ToolExecutedMessage;
 import com.ran.aicode.ai.model.message.ToolRequestMessage;

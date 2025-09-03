@@ -2,7 +2,6 @@ package com.ran.aicode.service;
 
 import com.ran.aicode.model.entity.App;
 import com.ran.aicode.model.entity.AppUser;
-import com.ran.aicode.model.entity.User;
 import com.ran.aicode.model.vo.AppTeamMemberVO;
 import com.mybatisflex.core.paginate.Page;
 import com.mybatisflex.core.service.IService;

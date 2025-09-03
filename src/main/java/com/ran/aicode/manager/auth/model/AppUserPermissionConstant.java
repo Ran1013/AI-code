@@ -1,7 +1,5 @@
 package com.ran.aicode.manager.auth.model;
 
-import lombok.Data;
-
 /**
  * 空间成员权限常量
  */
