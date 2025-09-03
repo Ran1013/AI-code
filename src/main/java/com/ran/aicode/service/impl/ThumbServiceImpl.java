@@ -1,0 +1,135 @@
+package com.ran.aicode.service.impl;
+
+
+import com.ran.aicode.mapper.ThumbMapper;
+import com.ran.aicode.model.entity.App;
+import com.ran.aicode.model.entity.Thumb;
+import com.ran.aicode.model.vo.AppThumbVO;
+import com.ran.aicode.service.AppService;
+import com.ran.aicode.service.ThumbService;
+import com.ran.aicode.utils.ThumbHotKeyUtil;
+import com.ran.aicode.utils.RedisKeyUtil;
+import com.mybatisflex.spring.service.impl.ServiceImpl;
+import jakarta.annotation.Resource;
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.ZSetOperations;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.List;
+import java.util.Set;
+
+import lombok.extern.slf4j.Slf4j;
+
+import static com.ran.aicode.constant.ThumbConstant.RANK_KEY;
+
+
+/**
+ * 服务层实现。
+ *
+ * @author <a>ran</a>
+ */
+@Slf4j
+@Service("thumbService")
+public class ThumbServiceImpl extends ServiceImpl<ThumbMapper, Thumb> implements ThumbService {
+
+    @Resource
+    private AppService appService;
+
+    @Resource
+    private RedisTemplate<String, Object> redisTemplate;
+
+    @Resource
+    private ThumbHotKeyUtil thumbHotKeyUtil;
+
+
+    @Override
+    public List<AppThumbVO> appThumbList() {
+        Set<ZSetOperations.TypedTuple<Object>> set = redisTemplate.opsForZSet().reverseRangeWithScores(RANK_KEY, 0, 7);
+        return set.stream()
+                .map(tuple -> {
+                    Long appId = (Long) tuple.getValue();
+                    Double score = tuple.getScore();
+                        App app = appService.getAppByIdWithHotKey((appId));
+                        if (app == null) {
+                            return null;
+                        }
+                        AppThumbVO appThumbVO = new AppThumbVO();
+                        appThumbVO.setId(app.getId());
+                        appThumbVO.setAppName(app.getAppName());
+                        appThumbVO.setThumbCount(score.intValue());
+                        return appThumbVO;
+                })
+                .filter(appThumbVO -> appThumbVO != null)
+                .collect(java.util.stream.Collectors.toList());
+    }
+
+    @Override
+    @Transactional
+    public boolean likeApp(Long appId, Long userId) {
+        // 检查是否已经点赞
+        if (isUserLikedApp(appId, userId)) {
+            return false; // 已经点赞过了
+        }
+
+        // 只记录到 Redis，由定时任务异步落库，避免与定时任务批量插入冲突
+        recordThumbToRedis(userId, appId, 1);
+        thumbHotKeyUtil.saveUserThumb(userId, appId);
+        return true;
+    }
+
+    @Override
+    @Transactional
+    public boolean unlikeApp(Long appId, Long userId) {
+        // 若未点赞，直接返回
+        if (!isUserLikedApp(appId, userId)) {
+            return false;
+        }
+        // 只记录到 Redis，由定时任务异步落库
+        recordThumbToRedis(userId, appId, -1);
+        // 移除热点缓存中的用户点赞记录
+        thumbHotKeyUtil.removeUserThumb(userId, appId);
+        return true;
+    }
+
+    @Override
+    public boolean isUserLikedApp(Long appId, Long userId) {
+        // 使用工具类检查用户是否已点赞应用
+        return thumbHotKeyUtil.isUserLikedApp(userId, appId);
+    }
+
+
+
+    /**
+     * 记录点赞操作到 Redis 临时数据中
+     * 由定时任务 SyncThumb2DBJob 统一同步到数据库
+     *
+     * @param userId 用户ID
+     * @param appId  应用ID
+     * @param delta  点赞数变化量（1表示点赞，-1表示取消点赞）
+     */
+    private void recordThumbToRedis(Long userId, Long appId, int delta) {
+        try {
+            // 获取当前时间，按10秒为一个时间段
+            LocalDateTime now = LocalDateTime.now();
+            String timeKey = now.format(DateTimeFormatter.ofPattern("HH:mm:")) +
+                    (now.getSecond() / 10) * 10;
+
+            // 构造 Redis 临时数据 key
+            String tempThumbKey = RedisKeyUtil.getTempThumbKey(timeKey);
+            String userIdAppId = userId + ":" + appId;
+
+            // 记录到 Redis 临时数据中
+            redisTemplate.opsForHash().put(tempThumbKey, userIdAppId, delta);
+
+            log.debug("记录点赞操作到 Redis 临时数据，userId: {}, appId: {}, delta: {}, timeKey: {}",
+                    userId, appId, delta, timeKey);
+        } catch (Exception e) {
+            log.error("记录点赞操作到 Redis 临时数据失败，userId: {}, appId: {}, delta: {}",
+                    userId, appId, delta, e);
+        }
+    }
+}

@@ -1,0 +1,22 @@
+package com.ran.aicode.mapper;
+
+
+import com.ran.aicode.model.entity.Thumb;
+import com.mybatisflex.core.BaseMapper;
+
+import java.util.List;
+
+/**
+ *  映射层。
+ *
+ * @author <a>ran</a>
+ */
+public interface ThumbMapper extends BaseMapper<Thumb> {
+
+    void deleteBatch(List<Thumb> thumbListDecr);
+
+    /**
+     * 批量查询已存在的 (userId, appId) 点赞记录
+     */
+    List<Thumb> selectExistList(List<Thumb> thumbList);
+}
