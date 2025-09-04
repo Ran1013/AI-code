@@ -4,7 +4,7 @@ import cn.hutool.core.io.FileUtil;
 import cn.hutool.core.util.StrUtil;
 import com.ran.aicode.exception.ErrorCode;
 import com.ran.aicode.exception.ThrowUtils;
-import com.ran.aicode.manager.CosManager;
+import com.ran.aicode.manager.ObsManager;
 import com.ran.aicode.service.ScreenshotService;
 import com.ran.aicode.utils.WebScreenshotUtils;
 import jakarta.annotation.Resource;
@@ -21,7 +21,7 @@ import java.util.UUID;
 public class ScreenshotServiceImpl implements ScreenshotService {
 
     @Resource
-    private CosManager cosManager;
+    private ObsManager obsManager;
 
     @Override
     public String generateAndUploadScreenshot(String webUrl) {
@@ -31,12 +31,12 @@ public class ScreenshotServiceImpl implements ScreenshotService {
         // 本地截图
         String localScreenshotPath = WebScreenshotUtils.saveWebPageScreenshot(webUrl);
         ThrowUtils.throwIf(StrUtil.isBlank(localScreenshotPath), ErrorCode.OPERATION_ERROR, "生成网页截图失败");
-        // 上传图片到 COS
+        // 上传图片到 OBS
         try {
-            String cosUrl = uploadScreenshotToCos(localScreenshotPath);
-            ThrowUtils.throwIf(StrUtil.isBlank(cosUrl), ErrorCode.OPERATION_ERROR, "上传截图到对象存储失败");
-            log.info("截图上传成功，URL：{}", cosUrl);
-            return cosUrl;
+            String obsUrl = uploadScreenshotToObs(localScreenshotPath);
+            ThrowUtils.throwIf(StrUtil.isBlank(obsUrl), ErrorCode.OPERATION_ERROR, "上传截图到对象存储失败");
+            log.info("截图上传成功，URL：{}", obsUrl);
+            return obsUrl;
         } finally {
             // 清理本地文件
             cleanupLocalFile(localScreenshotPath);
@@ -49,7 +49,7 @@ public class ScreenshotServiceImpl implements ScreenshotService {
      * @param localScreenshotPath 本地截图路径
      * @return 对象存储访问URL，失败返回null
      */
-    private String uploadScreenshotToCos(String localScreenshotPath) {
+    private String uploadScreenshotToObs(String localScreenshotPath) {
         if (StrUtil.isBlank(localScreenshotPath)) {
             return null;
         }
@@ -58,10 +58,10 @@ public class ScreenshotServiceImpl implements ScreenshotService {
             log.error("截图文件不存在: {}", localScreenshotPath);
             return null;
         }
-        // 生成 COS 对象键
+        // 生成 OBS 对象键
         String fileName = UUID.randomUUID().toString().substring(0, 8) + "_compressed.jpg";
-        String cosKey = generateScreenshotKey(fileName);
-        return cosManager.uploadFile(cosKey, screenshotFile);
+        String obsKey = generateScreenshotKey(fileName);
+        return obsManager.uploadFile(obsKey, screenshotFile);
     }
 
     /**

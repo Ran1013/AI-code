@@ -1,7 +1,7 @@
 package com.ran.aicode;
 
 import com.ran.aicode.controller.FileUploadController;
-import com.ran.aicode.manager.CosManager;
+import com.ran.aicode.manager.ObsManager;
 import com.ran.aicode.model.entity.User;
 import com.ran.aicode.service.UserService;
 import org.junit.jupiter.api.BeforeEach;
@@ -25,7 +25,7 @@ import static org.mockito.Mockito.when;
 class FileUploadControllerTest {
 
     @Mock
-    private CosManager cosManager;
+    private ObsManager obsManager;
 
     @Mock
     private UserService userService;
@@ -55,7 +55,7 @@ class FileUploadControllerTest {
         );
 
         when(userService.getLoginUser(any())).thenReturn(mockUser);
-        when(cosManager.uploadFile(anyString(), any())).thenReturn("https://example.com/images/test.jpg");
+        when(obsManager.uploadFile(anyString(), any())).thenReturn("https://example.com/images/test.jpg");
 
         // 执行测试
         var result = fileUploadController.uploadImage(file, request);
@@ -117,7 +117,7 @@ class FileUploadControllerTest {
         MockMultipartFile[] files = {file1, file2};
 
         when(userService.getLoginUser(any())).thenReturn(mockUser);
-        when(cosManager.uploadFile(anyString(), any()))
+        when(obsManager.uploadFile(anyString(), any()))
                 .thenReturn("https://example.com/images/test1.jpg")
                 .thenReturn("https://example.com/images/test2.png");
 
@@ -138,8 +138,8 @@ class FileUploadControllerTest {
         // 准备测试数据
         String imageUrl = "https://example.com/images/test.jpg";
 
-        when(cosManager.extractKeyFromUrl(imageUrl)).thenReturn("/images/test.jpg");
-        when(cosManager.deleteFile("/images/test.jpg")).thenReturn(true);
+        when(obsManager.extractKeyFromUrl(imageUrl)).thenReturn("/images/test.jpg");
+        when(obsManager.deleteFile("/images/test.jpg")).thenReturn(true);
 
         // 执行测试
         var result = fileUploadController.deleteImage(imageUrl);

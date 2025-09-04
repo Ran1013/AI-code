@@ -9,7 +9,7 @@ import com.ran.aicode.constant.UserConstant;
 import com.ran.aicode.exception.BusinessException;
 import com.ran.aicode.exception.ErrorCode;
 import com.ran.aicode.exception.ThrowUtils;
-import com.ran.aicode.manager.CosManager;
+import com.ran.aicode.manager.ObsManager;
 import com.ran.aicode.model.entity.User;
 import com.ran.aicode.service.UserService;
 import jakarta.annotation.Resource;
@@ -34,7 +34,7 @@ import java.util.UUID;
 public class FileUploadController {
 
     @Resource
-    private CosManager cosManager;
+    private ObsManager obsManager;
 
     @Resource
     private UserService userService;
@@ -84,16 +84,16 @@ public class FileUploadController {
             String fileExtension = getFileExtension(originalFilename);
             String fileName = generateUniqueFileName(fileExtension);
             
-            // 生成COS对象键
-            String cosKey = generateImageKey(fileName);
+            // 生成OBS对象键
+            String obsKey = generateImageKey(fileName);
             
             // 创建临时文件
             File tempFile = File.createTempFile("upload_", fileExtension);
             file.transferTo(tempFile);
             
             try {
-                // 上传到COS
-                String imageUrl = cosManager.uploadFile(cosKey, tempFile);
+                // 上传到OBS
+                String imageUrl = obsManager.uploadFile(obsKey, tempFile);
                 ThrowUtils.throwIf(StrUtil.isBlank(imageUrl), ErrorCode.OPERATION_ERROR, 
                         "图片上传失败");
                 
@@ -155,16 +155,16 @@ public class FileUploadController {
                 String fileExtension = getFileExtension(originalFilename);
                 String fileName = generateUniqueFileName(fileExtension);
                 
-                // 生成COS对象键
-                String cosKey = generateImageKey(fileName);
+                // 生成OBS对象键
+                String obsKey = generateImageKey(fileName);
                 
                 // 创建临时文件
                 File tempFile = File.createTempFile("upload_", fileExtension);
                 file.transferTo(tempFile);
                 
                 try {
-                    // 上传到COS
-                    String imageUrl = cosManager.uploadFile(cosKey, tempFile);
+                    // 上传到OBS
+                    String imageUrl = obsManager.uploadFile(obsKey, tempFile);
                     ThrowUtils.throwIf(StrUtil.isBlank(imageUrl), ErrorCode.OPERATION_ERROR, 
                             "第" + (i + 1) + "个图片上传失败");
                     
@@ -199,12 +199,12 @@ public class FileUploadController {
         ThrowUtils.throwIf(StrUtil.isBlank(imageUrl), ErrorCode.PARAMS_ERROR, "图片URL不能为空");
         
         try {
-            // 从URL中提取COS对象键
-            String cosKey = cosManager.extractKeyFromUrl(imageUrl);
-            ThrowUtils.throwIf(StrUtil.isBlank(cosKey), ErrorCode.PARAMS_ERROR, "无效的图片URL");
+            // 从URL中提取OBS对象键
+            String obsKey = obsManager.extractKeyFromUrl(imageUrl);
+            ThrowUtils.throwIf(StrUtil.isBlank(obsKey), ErrorCode.PARAMS_ERROR, "无效的图片URL");
             
-            // 删除COS中的文件
-            boolean success = cosManager.deleteFile(cosKey);
+            // 删除OBS中的文件
+            boolean success = obsManager.deleteFile(obsKey);
             ThrowUtils.throwIf(!success, ErrorCode.OPERATION_ERROR, "删除图片失败");
             
             log.info("管理员删除图片成功：{}", imageUrl);
@@ -261,11 +261,11 @@ public class FileUploadController {
     }
 
     /**
-     * 生成图片的COS对象键
+     * 生成图片的OBS对象键
      * 格式：/images/2025/01/31/filename.jpg
      *
      * @param fileName 文件名
-     * @return COS对象键
+     * @return OBS对象键
      */
     private String generateImageKey(String fileName) {
         String datePath = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy/MM/dd"));

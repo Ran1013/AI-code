@@ -209,7 +209,7 @@ flowchart TB
 | **Caffeine** | - | 本地缓存 |
 | **HotKey** | - | 热点数据缓存 |
 | **Selenium** | - | 网页截图 |
-| **腾讯云COS** | - | 对象存储 |
+| **华为云OBS** | - | 对象存储 |
 
 ### 前端技术栈
 
@@ -251,7 +251,7 @@ graph TB
         VT[虚拟线程池<br/>异步任务处理]
         SCREEN[网页截图服务<br/>ScreenshotService]
         BUILDER[Vue项目构建<br/>VueProjectBuilder]
-        COS[对象存储<br/>CosManager]
+        OBS[对象存储<br/>ObsManager]
     end
     
     subgraph "数据存储层"
@@ -287,7 +287,7 @@ graph TB
     AI -->|异步任务| VT
     VT -->|截图任务| SCREEN
     VT -->|构建任务| BUILDER
-    SCREEN -->|上传文件| COS
+    SCREEN -->|上传文件| OBS
 ```
 
 ### WebSocket实时协作时序图
@@ -327,7 +327,7 @@ sequenceDiagram
     Note over A,VT: 部署应用
     A->>VT: 异步生成截图
     A->>VT: 异步构建Vue项目
-    VT->>VT: 上传截图到COS
+    VT->>VT: 上传截图到OBS
     VT->>VT: 执行npm构建
     
     Note over A,B: 用户B可以看到最终生成的网页效果和截图封面
@@ -607,11 +607,11 @@ langchain4j:
       base-url: ${OPENAI_BASE_URL:https://api.openai.com/v1}
 
 # 对象存储配置
-cos:
-  secret-id: ${COS_SECRET_ID:your_secret_id}
-  secret-key: ${COS_SECRET_KEY:your_secret_key}
-  region: ${COS_REGION:ap-beijing}
-  bucket-name: ${COS_BUCKET_NAME:your_bucket}
+obs:
+  access-key: ${OBS_ACCESS_KEY:your_access_key}
+  secret-key: ${OBS_SECRET_KEY:your_secret_key}
+  endpoint: ${OBS_ENDPOINT:your_endpoint}
+  bucket-name: ${OBS_BUCKET_NAME:your_bucket}
 
 # HotKey热点缓存配置
 hotkey:
