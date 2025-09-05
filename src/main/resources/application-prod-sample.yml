@@ -32,9 +32,12 @@ spring:
           jmx-enabled: false
           test-on-borrow: false
           test-while-idle: false
-  # 邮箱配置
+
+  # 邮箱配置 
+  #腾讯云邮箱推送服务
   mail:
-    host: smtp.example.com
+    host: gz-smtp.qcloudmail.com
+    port: 465
     username: your-email@example.com
     password: <YOUR_EMAIL_PASSWORD>
     emailFrom: your-email@example.com
