@@ -33,19 +33,19 @@ spring:
           test-on-borrow: false
           test-while-idle: false
 
-  # 邮箱配置 
-  #腾讯云邮箱推送服务
+  # 邮箱配置 (腾讯云邮件推送)
   mail:
     host: gz-smtp.qcloudmail.com
     port: 465
-    username: your-email@example.com
-    password: <YOUR_EMAIL_PASSWORD>
-    emailFrom: your-email@example.com
+    username: your-email@example.com # 腾讯云邮件推送的SMTP用户名
+    password: <YOUR_EMAIL_SMTP_PASSWORD> # 腾讯云邮件推送的SMTP密码
+    from: your-verified-sender@example.com # 在腾讯云验证过的发信地址
     properties:
       mail:
         smtp:
           ssl:
             enable: true
+          auth: true
   # session 配置
   session:
     store-type: redis
@@ -54,7 +54,7 @@ spring:
 server:
   port: 8101
   servlet:
-    context-path: /api
+    context-path: /example
     session:
       cookie:
         max-age: 2592000
@@ -130,6 +130,14 @@ sa-token:
 dashscope:
   api-key: <YOUR_DASHSCOPE_API_KEY>
   image-model: wan2.2-t2i-flash
+
+# 腾讯云 API 配置
+tencent:
+  secret-id: <YOUR_TENCENT_CLOUD_SECRET_ID>
+  secret-key: <YOUR_TENCENT_CLOUD_SECRET_KEY>
+  ses:
+    region: ap-guangzhou # 邮件服务地域，例如 ap-guangzhou
+    template-id: 12345 # 请替换为你在腾讯云创建的邮件模板ID
 
 # Pexels 图片搜索配置
 pexels:
