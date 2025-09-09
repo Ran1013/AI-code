@@ -2,20 +2,17 @@ import { useLoginUserStore } from '@/stores/loginUser'
 import { message } from 'ant-design-vue'
 import router from '@/router'
 
-// 是否为首次获取登录用户
-let firstFetchLoginUser = true
-
 /**
  * 全局权限校验
  */
 router.beforeEach(async (to, from, next) => {
   const loginUserStore = useLoginUserStore()
   let loginUser = loginUserStore.loginUser
-  // 确保页面刷新，首次加载时，能够等后端返回用户信息后再校验权限
-  if (firstFetchLoginUser) {
+  // 如果当前 store 中没有用户信息，则尝试获取
+  if (!loginUser || !loginUser.id) {
+    // 加 await 是为了等用户信息获取成功后，再执行后续的权限校验
     await loginUserStore.fetchLoginUser()
     loginUser = loginUserStore.loginUser
-    firstFetchLoginUser = false
   }
   const toUrl = to.fullPath
   if (toUrl.startsWith('/admin')) {

@@ -8,7 +8,7 @@
         <version>3.5.4</version>
         <relativePath/> <!-- lookup parent from repository -->
     </parent>
-    <groupId>com.ran</groupId>
+    <groupId>com.ran.aicode</groupId>
     <artifactId>ai-code</artifactId>
     <version>0.0.1-SNAPSHOT</version>
     <name>ai-code</name>
@@ -223,6 +223,7 @@
             </plugin>
         </plugins>
     </build>
+
 
 
 </project>

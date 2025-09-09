@@ -64,7 +64,7 @@ const createApp = async () => {
   creating.value = true
   try {
 
-    
+
     const res = await addApp({
       initPrompt: userPrompt.value,
     })
@@ -210,10 +210,10 @@ onMounted(() => {
       <div class="input-section">
         <div class="input-container">
 
-    
+
           <a-textarea
             v-model:value="userPrompt"
-            placeholder="使用 ran AI 创建一个应用........"
+            placeholder="使用 AI 创建一个应用........"
             :rows="3"
             :maxlength="1000"
             class="prompt-input"
@@ -223,10 +223,10 @@ onMounted(() => {
               <!-- 左侧可以放置其他操作按钮 -->
             </div>
             <div class="right-actions">
-              <a-button 
-                type="primary" 
-                size="large" 
-                @click="createApp" 
+              <a-button
+                type="primary"
+                size="large"
+                @click="createApp"
                 :loading="creating"
                 class="submit-btn"
               >
@@ -237,7 +237,7 @@ onMounted(() => {
             </div>
           </div>
         </div>
-        
+
 
       </div>
 
@@ -733,29 +733,29 @@ onMounted(() => {
   .container {
     padding: 20px 16px;
   }
-  
+
   .hero-title {
     font-size: 32px;
   }
-  
+
   .hero-subtitle {
     font-size: 16px;
   }
-  
+
   .input-container {
     padding: 24px 20px;
   }
-  
+
   .template-grid {
     grid-template-columns: 1fr;
     max-width: 100%;
   }
-  
+
   .template-btn {
     height: 48px;
     font-size: 13px;
   }
-  
+
   .submit-btn {
     width: 48px !important;
     height: 48px !important;
@@ -764,39 +764,39 @@ onMounted(() => {
     max-width: 48px !important;
     max-height: 48px !important;
   }
-  
+
   .submit-icon {
     font-size: 18px;
   }
-  
+
   .app-grid {
     grid-template-columns: 1fr;
   }
-  
+
   .section-title {
     font-size: 24px;
   }
-  
+
   .section-header {
     flex-direction: column;
     gap: 16px;
     align-items: flex-start;
   }
-  
+
   .team-link {
     align-self: flex-end;
   }
-  
+
   .input-actions {
     flex-direction: column;
     gap: 16px;
     align-items: stretch;
   }
-  
+
   .right-actions {
     justify-content: center;
   }
-  
+
   .mode-select {
     min-width: 120px;
   }
