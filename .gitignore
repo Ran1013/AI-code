@@ -85,3 +85,4 @@ fabric.properties
 /.idea/
 /.vscode/
 /target/
+node_modules/

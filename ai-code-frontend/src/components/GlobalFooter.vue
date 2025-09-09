@@ -3,7 +3,8 @@
     <div class="footer-content">
       <div class="footer-copyright">
         <p class="copyright-text">
-          © 2024 AI Code. All rights reserved.
+          © 2025 AI Code. 博客:
+          <a class="blog-link" href="http://example.com" target="_blank" rel="noopener noreferrer">example.com</a>
         </p>
       </div>
     </div>

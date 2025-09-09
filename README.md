@@ -615,7 +615,7 @@ obs:
 
 # HotKey热点缓存配置
 hotkey:
-  app-name: ranAi
+  app-name: Ai-codegen
   caffeine-size: 10000
   push-period: 1000
   etcd-server: http://localhost:2379
