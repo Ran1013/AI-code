@@ -412,6 +412,7 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
      * @param appId 应用 ID
      * @return App 实体，可能为 null
      */
+    @Override
     public App getAppByIdWithHotKey(Long appId) {
         String cacheKey = ThumbConstant.APP_ID_HOTKEY_PREFIX + appId;
         if (JdHotKeyStore.isHotKey(cacheKey)) {
