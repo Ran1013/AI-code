@@ -20,7 +20,9 @@ export default defineConfig({
         changeOrigin: true,
         secure: false,
         ws: true, // 启用 WebSocket 代理
-        rewrite: (path) => path.replace(/^\/api/, '/example/api'),
+        // 将前端的 /api 前缀转发到后端的 context-path /example
+        // 后端实际接口是 /example/user/...
+        rewrite: (path) => path.replace(/^\/api/, '/example'),
       },
     },
   },
