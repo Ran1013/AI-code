@@ -36,7 +36,7 @@
           </div>
         </template>
         <template v-else-if="column.dataIndex === 'createTime'">
-          {{ dayjs(record.createTime).format('YYYY-MM-DD HH:mm:ss') }}
+          {{ formatTime(record.createTime) }}
         </template>
         <template v-else-if="column.key === 'action'">
           <a-space>
@@ -177,6 +177,14 @@ const doSearch = () => {
   // 重置页码
   searchParams.pageNum = 1
   fetchData()
+}
+
+// 统一时间格式化，空值不再使用当前时间兜底，避免“随着当前时间变化”的问题
+const formatTime = (t?: string | number | Date) => {
+  if (!t) {
+    return '--'
+  }
+  return dayjs(t).format('YYYY-MM-DD HH:mm:ss')
 }
 
 // 编辑用户

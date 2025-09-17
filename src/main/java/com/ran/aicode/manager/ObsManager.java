@@ -45,6 +45,7 @@ public class ObsManager {
     public String uploadFile(String key, File file) {
         try {
             putObject(key, file);
+            // 回退：保持原有拼接（可能产生双斜杠，但与你当前桶策略兼容）
             String url = String.format("%s/%s", obsClientConfig.getHost(), key);
             log.info("文件上传到 OBS 成功：{} -> {}", file.getName(), url);
             return url;
@@ -78,10 +79,22 @@ public class ObsManager {
      * @return OBS对象键
      */
     public String extractKeyFromUrl(String url) {
-        if (url == null || !url.startsWith(obsClientConfig.getHost())) {
+        if (url == null) {
             return null;
         }
-        return url.substring(obsClientConfig.getHost().length() + 1);
+        String host = obsClientConfig.getHost();
+        if (host.endsWith("/")) {
+            host = host.substring(0, host.length() - 1);
+        }
+        if (!url.startsWith(host)) {
+            return null;
+        }
+        String key = url.substring(host.length());
+        // 去掉可能存在的开头斜杠
+        if (key.startsWith("/")) {
+            key = key.substring(1);
+        }
+        return key;
     }
 }
 
