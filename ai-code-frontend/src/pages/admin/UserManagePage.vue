@@ -56,6 +56,10 @@
       @cancel="handleEditCancel"
       :confirmLoading="editLoading"
     >
+      <template #footer>
+        <a-button type="primary" :loading="editLoading" @click="handleEditOk">确定</a-button>
+        <a-button @click="handleEditCancel">取消</a-button>
+      </template>
       <a-form :model="editForm" layout="vertical">
         <a-form-item label="用户ID">
           <a-input v-model:value="editForm.id" disabled />
