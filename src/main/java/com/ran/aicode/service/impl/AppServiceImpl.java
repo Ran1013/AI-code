@@ -367,6 +367,7 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         String appName = appQueryRequest.getAppName();
         String codeGenType = appQueryRequest.getCodeGenType();
         Long userId = appQueryRequest.getUserId();
+        String creatorKeyword = appQueryRequest.getCreatorKeyword();
         Integer priority = appQueryRequest.getPriority();
         String sortField = appQueryRequest.getSortField();
         String sortOrder = appQueryRequest.getSortOrder();
@@ -392,6 +393,23 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         }
         if (StrUtil.isNotBlank(appName)) {
             queryWrapper.like("appName", appName);
+        }
+
+        // 处理创建者关键字（ID/账号/用户名）。仅当未显式传 userId 时生效
+        if (userId == null && StrUtil.isNotBlank(creatorKeyword)) {
+            // 尝试解析为数字ID
+            Long parsedId = null;
+            try {
+                parsedId = Long.valueOf(creatorKeyword.trim());
+            } catch (Exception ignore) {}
+
+            if (parsedId != null) {
+                queryWrapper.and("userId = ?", parsedId);
+            } else {
+                // 根据账号或用户名模糊匹配用户ID集合（使用子查询占位符避免获取参数列表的方法依赖）
+                String likeKw = "%" + creatorKeyword + "%";
+                queryWrapper.and("userId in (select id from `user` where userAccount like ? or userName like ?)", likeKw, likeKw);
+            }
         }
 
         // 排序

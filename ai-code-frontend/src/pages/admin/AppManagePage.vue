@@ -6,7 +6,7 @@
         <a-input v-model:value="searchParams.appName" placeholder="输入应用名称" />
       </a-form-item>
       <a-form-item label="创建者">
-        <a-input v-model:value="searchParams.userId" placeholder="输入用户ID" />
+        <a-input v-model:value="creatorKeyword" placeholder="输入用户ID/账号/用户名" />
       </a-form-item>
       <a-form-item label="应用属性">
         <a-select
@@ -187,6 +187,8 @@ const searchParams = reactive<API.AppQueryRequest>({
   pageNum: 1,
   pageSize: 10,
 })
+// 创建者搜索关键字（可输入 id/账号/用户名）
+const creatorKeyword = ref<string>('')
 
 // 获取数据
 const fetchData = async () => {
@@ -232,9 +234,12 @@ const doTableChange = (page: { current: number; pageSize: number }) => {
 }
 
 // 搜索
-const doSearch = () => {
+const doSearch = async () => {
   // 重置页码
   searchParams.pageNum = 1
+  // 直接把关键字传给后端
+  ;(searchParams as any).creatorKeyword = creatorKeyword.value?.trim() || undefined
+  searchParams.userId = undefined
   fetchData()
 }
 
@@ -242,9 +247,11 @@ const doSearch = () => {
 const resetSearch = () => {
   searchParams.appName = undefined
   searchParams.userId = undefined
+  creatorKeyword.value = ''
   searchParams.isTeam = undefined
   searchParams.codeGenType = undefined
   searchParams.pageNum = 1
+  ;(searchParams as any).creatorKeyword = undefined
   fetchData()
 }
 
