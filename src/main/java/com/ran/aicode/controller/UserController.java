@@ -24,6 +24,7 @@ import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
+import com.mybatisflex.core.query.QueryWrapper;
 
 import java.util.List;
 
@@ -142,7 +143,15 @@ public class UserController {
 
         // 如果ID查询失败或未提供ID，则使用账号查询
         if (user == null && StrUtil.isNotBlank(userAccount)) {
-            user = userService.getUserByUserAccount(userAccount);
+            // 先按账号精确查
+            user = userService.getUserByUserAccount(userAccount.trim());
+            // 兼容大小写差异或输入用户名场景：再做一次兜底匹配
+            if (user == null) {
+                QueryWrapper qw = QueryWrapper.create()
+                        .where("lower(userAccount) = ?", userAccount.trim().toLowerCase())
+                        .or("userName = ?", userAccount.trim());
+                user = userService.getOne(qw);
+            }
         }
 
         if (user == null) {
