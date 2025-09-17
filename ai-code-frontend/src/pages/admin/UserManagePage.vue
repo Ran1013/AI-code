@@ -36,7 +36,8 @@
           </div>
         </template>
         <template v-else-if="column.dataIndex === 'createTime'">
-          {{ formatTime(record.createTime) }}
+          <span v-if="record.createTime">{{ formatTime(record.createTime) }}</span>
+          <span v-else class="text-gray">-</span>
         </template>
         <template v-else-if="column.key === 'action'">
           <a-space>
@@ -83,7 +84,7 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { deleteUser, listUserVoByPage, updateUserAdmin } from '../../api/userController'
 import { message } from 'ant-design-vue'
-import dayjs from 'dayjs'
+import { formatTime } from '@/utils/time'
 
 const columns = [
   {
@@ -177,14 +178,6 @@ const doSearch = () => {
   // 重置页码
   searchParams.pageNum = 1
   fetchData()
-}
-
-// 统一时间格式化，空值不再使用当前时间兜底，避免“随着当前时间变化”的问题
-const formatTime = (t?: string | number | Date) => {
-  if (!t) {
-    return '--'
-  }
-  return dayjs(t).format('YYYY-MM-DD HH:mm:ss')
 }
 
 // 编辑用户
