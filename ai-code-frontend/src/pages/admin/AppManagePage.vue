@@ -81,7 +81,7 @@
           {{ formatTime(record.createTime) }}
         </template>
         <template v-else-if="column.dataIndex === 'user'">
-          <UserInfo :user="record.user" size="small" />
+          <UserInfo :user="userCache[record.userId]" size="small" />
         </template>
         <template v-else-if="column.key === 'action'">
           <a-space>
@@ -109,6 +109,7 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import { listAppByPage, deleteApp as deleteAppApi, updateApp } from '@/api/appController'
+import { getUserVoById } from '@/api/userController'
 import { CODE_GEN_TYPE_OPTIONS, formatCodeGenType } from '@/utils/codeGenTypes'
 import { formatTime } from '@/utils/time'
 import UserInfo from '@/components/UserInfo.vue'
@@ -178,6 +179,8 @@ const columns = [
 // 数据
 const data = ref<API.AppVO[]>([])
 const total = ref(0)
+// 用户缓存：userId => UserVO
+const userCache = reactive<Record<string, API.UserVO>>({})
 
 // 搜索条件
 const searchParams = reactive<API.AppQueryRequest>({
@@ -194,6 +197,8 @@ const fetchData = async () => {
     if (res.data.data) {
       data.value = res.data.data.records ?? []
       total.value = res.data.data.totalRow ?? 0
+      // 预加载创建者信息
+      await preloadCreators(data.value)
     } else {
       message.error('获取数据失败，' + res.data.message)
     }
@@ -241,6 +246,25 @@ const resetSearch = () => {
   searchParams.codeGenType = undefined
   searchParams.pageNum = 1
   fetchData()
+}
+
+// 预加载创建者信息，按 userId 拉取并缓存
+const preloadCreators = async (records: API.AppVO[]) => {
+  const ids = Array.from(new Set(records.map(r => r.userId).filter(Boolean))) as number[]
+  const need = ids.filter(id => !userCache[id as any])
+  if (need.length === 0) return
+  try {
+    await Promise.all(
+      need.map(async (id) => {
+        const res = await getUserVoById({ id })
+        if (res.data.code === 0 && res.data.data) {
+          userCache[id as any] = res.data.data
+        }
+      })
+    )
+  } catch (e) {
+    // 忽略单个失败
+  }
 }
 
 // 编辑应用
