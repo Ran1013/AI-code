@@ -10,6 +10,8 @@ import com.ran.aicode.websocket.model.AppRequestMessage;
 import com.ran.aicode.websocket.model.AppResponseMessage;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.module.SimpleModule;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
@@ -237,6 +239,9 @@ public class AppEditHandler extends TextWebSocketHandler {
         module.addSerializer(Long.class, ToStringSerializer.instance);
         module.addSerializer(Long.TYPE, ToStringSerializer.instance); // 支持 long 基本类型
         objectMapper.registerModule(module);
+        // 支持 Java8 时间类型序列化
+        objectMapper.registerModule(new JavaTimeModule());
+        objectMapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
         // 序列化为 JSON 字符串
         String message = objectMapper.writeValueAsString(appResponseMessage);
         TextMessage textMessage = new TextMessage(message);
