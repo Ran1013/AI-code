@@ -25,8 +25,10 @@ import java.io.File;
 @Slf4j
 public class StaticResourceController {
 
-    // 应用生成根目录（用于浏览）
-    private static final String PREVIEW_ROOT_DIR = AppConstant.CODE_OUTPUT_ROOT_DIR;
+    // 应用部署根目录（用于浏览）
+    private static final String DEPLOY_ROOT_DIR = AppConstant.CODE_DEPLOY_ROOT_DIR;
+    // 应用生成根目录（用于预览）
+    private static final String OUTPUT_ROOT_DIR = AppConstant.CODE_OUTPUT_ROOT_DIR;
 
     /**
      * 提供静态资源访问，支持目录重定向
@@ -57,27 +59,27 @@ public class StaticResourceController {
                 resourcePath = "/index.html";
             }
             
-            // 构建文件路径
-            String filePath = PREVIEW_ROOT_DIR + "/" + deployKey + resourcePath;
-            File file = new File(filePath);
-            
-            log.info("尝试访问文件: {}", filePath);
-            
-            // 如果文件不存在，尝试查找Vue项目的dist目录
-            if (!file.exists() && deployKey.startsWith("vue_project_")) {
-                // 对于Vue项目，尝试在dist目录中查找
-                String distFilePath = PREVIEW_ROOT_DIR + "/" + deployKey + "/dist" + resourcePath;
-                File distFile = new File(distFilePath);
-                log.info("Vue项目，尝试dist目录: {}", distFilePath);
-                if (distFile.exists()) {
-                    file = distFile;
-                    log.info("找到dist文件: {}", distFilePath);
+            // 依次尝试以下路径（部署优先，其次预览目录；都尝试dist与根目录）
+            String[] tryPaths = new String[]{
+                    DEPLOY_ROOT_DIR + "/" + deployKey + resourcePath,
+                    DEPLOY_ROOT_DIR + "/" + deployKey + "/dist" + resourcePath,
+                    OUTPUT_ROOT_DIR + "/" + deployKey + resourcePath,
+                    OUTPUT_ROOT_DIR + "/" + deployKey + "/dist" + resourcePath
+            };
+            File file = null;
+            for (String p : tryPaths) {
+                File f = new File(p);
+                log.info("尝试访问文件: {}", p);
+                if (f.exists()) {
+                    file = f;
+                    log.info("命中文件: {}", p);
+                    break;
                 }
             }
             
             // 检查文件是否存在
-            if (!file.exists()) {
-                log.warn("文件不存在: {}", file.getAbsolutePath());
+            if (file == null || !file.exists()) {
+                log.warn("文件不存在: deployKey={}, resourcePath={}", deployKey, resourcePath);
                 return ResponseEntity.notFound().build();
             }
             
