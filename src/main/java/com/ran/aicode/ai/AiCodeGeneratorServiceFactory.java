@@ -54,14 +54,14 @@ public class AiCodeGeneratorServiceFactory {
         // 根据代码生成类型选择不同的模型配置
         return switch (codeGenType) {
             case VUE_PROJECT -> {
-                // 使用多例模式的 StreamingChatModel 解决并发问题
+                // 使用多例模式的 StreamingChatModel 解决并发问题（VUE 项目生成链路保留流式 + 工具能力）
                 StreamingChatModel reasoningStreamingChatModel = SpringContextUtil.getBean("reasoningStreamingChatModelPrototype", StreamingChatModel.class);
                 yield AiServices.builder(AiCodeGeneratorService.class)
                         .streamingChatModel(reasoningStreamingChatModel)
                         .chatMemoryProvider(memoryId -> chatMemory)
                         .tools(toolManager.getAllTools())
-                        .maxSequentialToolsInvocations(15)  // 最多连续调用 15 次工具
-//                        .inputGuardrails(new PromptSafetyInputGuardrail()) // 添加输入护轨
+                        .maxSequentialToolsInvocations(15)
+//                        .inputGuardrails(new PromptSafetyInputGuardrail())
                         .hallucinatedToolNameStrategy(toolExecutionRequest -> ToolExecutionResultMessage.from(
                                 toolExecutionRequest, "Error: there is no tool called " + toolExecutionRequest.name()
                         ))
