@@ -20,10 +20,12 @@ export const getDeployUrl = (deployKey: string) => {
 
 // 获取静态资源预览URL
 export const getStaticPreviewUrl = (codeGenType: string, appId: string) => {
-  const baseUrl = `${STATIC_BASE_URL}/${codeGenType}_${appId}/`
+  // 将枚举值转换为小写并替换下划线
+  const normalizedType = codeGenType.toLowerCase().replace('_', '_')
+  const baseUrl = `${STATIC_BASE_URL}/${normalizedType}_${appId}/`
   
   // Vue 工程模式需要添加 dist/index.html 后缀
-  if (codeGenType === 'vue_project') {
+  if (normalizedType === 'vue_project') {
     return `${baseUrl}dist/index.html`
   }
   

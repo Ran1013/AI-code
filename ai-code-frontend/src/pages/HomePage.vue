@@ -209,8 +209,6 @@ onMounted(() => {
       <!-- 输入区域 -->
       <div class="input-section">
         <div class="input-container">
-
-
           <a-textarea
             v-model:value="userPrompt"
             placeholder="使用 AI 创建一个应用........"
@@ -237,8 +235,6 @@ onMounted(() => {
             </div>
           </div>
         </div>
-
-
       </div>
 
       <!-- 快捷模板 -->
@@ -326,8 +322,6 @@ onMounted(() => {
           />
         </div>
       </div>
-
-
     </div>
   </div>
 </template>
