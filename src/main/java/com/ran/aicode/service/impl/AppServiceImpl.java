@@ -372,6 +372,7 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         String sortField = appQueryRequest.getSortField();
         String sortOrder = appQueryRequest.getSortOrder();
         Integer isPublic = appQueryRequest.getIsPublic();
+        Integer isTeam = appQueryRequest.getIsTeam();
 
         QueryWrapper queryWrapper = QueryWrapper.create();
 
@@ -390,6 +391,9 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         }
         if (isPublic != null) {
             queryWrapper.eq("isPublic", isPublic);
+        }
+        if (isTeam != null) {
+            queryWrapper.eq("isTeam", isTeam);
         }
         if (StrUtil.isNotBlank(appName)) {
             queryWrapper.like("appName", appName);
