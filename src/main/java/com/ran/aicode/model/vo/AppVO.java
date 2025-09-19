@@ -98,5 +98,10 @@ public class AppVO implements Serializable {
      */
     private List<String> permissionList = new ArrayList<>();
 
+    /**
+     * 创建者信息（脱敏）
+     */
+    private UserVO user;
+
     private static final long serialVersionUID = 1L;
 } 

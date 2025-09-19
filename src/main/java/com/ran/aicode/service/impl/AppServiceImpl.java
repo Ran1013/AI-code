@@ -320,6 +320,17 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         }
         AppVO appVO = new AppVO();
         BeanUtil.copyProperties(app, appVO);
+        // 追加创建者信息
+        try {
+            if (app.getUserId() != null) {
+                User creator = userService.getById(app.getUserId());
+                if (creator != null) {
+                    appVO.setUser(userService.getUserVO(creator));
+                }
+            }
+        } catch (Exception ignore) {
+            // 保底：不影响主流程
+        }
         return appVO;
     }
 
