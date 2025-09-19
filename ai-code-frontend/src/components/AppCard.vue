@@ -44,12 +44,20 @@
         </div>
       </div>
       <div class="app-meta">
-        <div class="app-author">
+<!--        <div class="app-author">
           <a-avatar :size="24" class="author-avatar">
-            U
           </a-avatar>
           <span class="author-name">{{ featured ? '官方' : '未知用户' }}</span>
+        </div>-->
+
+
+        <div class="app-author">
+          <a-avatar :size="24" class="author-avatar" :src="(app as any)?.user?.userAvatar">
+            {{ ((app as any)?.user?.userName || 'U').charAt(0) }}
+          </a-avatar>
+          <span class="author-name">{{ featured ? '官方' : ((app as any)?.user?.userName || '未知用户') }}</span>
         </div>
+        
         <div class="app-actions">
           <a-button type="text" size="small" @click="handleViewChat" class="action-btn">
             对话
