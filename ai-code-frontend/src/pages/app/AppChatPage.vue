@@ -342,7 +342,7 @@ import UploadButton from '@/components/UploadButton.vue'
 import {
   getAppById,
   deployApp as deployAppApi,
-  deleteApp as deleteAppApi,
+  deleteMyApp as deleteMyAppApi,
   downloadAppCode,
   cancelCodeGeneration,
 } from '@/api/appController'
@@ -1452,12 +1452,12 @@ const previewImage = (imageUrl: string) => {
   imagePreviewVisible.value = true
 }
 
-// 删除应用
+// 删除应用（普通用户删除自己的应用走 /app/delete/my）
 const deleteApp = async () => {
   if (!appInfo.value?.id) return
 
   try {
-    const res = await deleteAppApi({ id: appInfo.value.id })
+    const res = await deleteMyAppApi({ id: appInfo.value.id })
     if (res.data.code === 0) {
       message.success('删除成功')
       appDetailVisible.value = false
