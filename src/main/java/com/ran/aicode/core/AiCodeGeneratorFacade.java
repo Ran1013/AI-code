@@ -218,6 +218,11 @@ public class AiCodeGeneratorFacade {
                         sink.next(JSONUtil.toJsonStr(toolRequestMessage));
                     })
                     .onToolExecuted((ToolExecution toolExecution) -> {
+                        // 工具已经在 LangChain4j 内部执行了，这里只是记录结果
+                        log.info("工具执行完成: toolName={}, result={}", 
+                                toolExecution.request().name(), 
+                                cn.hutool.core.util.StrUtil.maxLength(toolExecution.result(), 100));
+                        
                         ToolExecutedMessage toolExecutedMessage = new ToolExecutedMessage(toolExecution);
                         sink.next(JSONUtil.toJsonStr(toolExecutedMessage));
                     })
