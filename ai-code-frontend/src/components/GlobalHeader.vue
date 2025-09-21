@@ -286,7 +286,8 @@ const doLogout = async () => {
 .user-status-container {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px; /* 减少间距，让普通用户token标识更靠近头像 */
+  margin-left: -40px; /* 整个用户状态容器向左移动更多 */
 }
 
 /* 确保所有用户状态标签垂直对齐 */
@@ -299,6 +300,11 @@ const doLogout = async () => {
   min-height: 24px; /* 确保最小高度一致 */
 }
 
+/* 普通用户token标识向左偏移，与其他徽章对齐 */
+.user-status-container .ant-tag[color="blue"] {
+  margin-left: 0px; /* 回退到无偏移 */
+}
+
 .user-info {
   cursor: pointer;
   padding: 8px 12px;
@@ -307,6 +313,7 @@ const doLogout = async () => {
   display: flex;
   align-items: center;
   gap: 8px;
+  margin-left: 0px; /* 回退到无偏移 */
 }
 
 .user-info:hover {
