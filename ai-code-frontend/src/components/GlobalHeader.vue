@@ -33,7 +33,7 @@
             <a-tag v-else-if="tokenInfo && tokenInfo.userRole === 'member'" color="orange">
               会员
             </a-tag>
-            <a-tag v-else-if="tokenInfo" color="blue">
+            <a-tag v-else-if="tokenInfo" :color="getTokenTagColor(tokenInfo)">
               使用量: {{ tokenInfo.usedTokens }}/{{ tokenInfo.totalTokens }}
             </a-tag>
             <a-tag v-else color="default">
@@ -115,6 +115,28 @@ const loadTokenInfo = async () => {
   } else {
     console.log('GlobalHeader: 用户未登录，跳过token信息获取')
   }
+}
+
+// 根据token使用量计算标识颜色
+const getTokenTagColor = (tokenInfo: API.User) => {
+  if (!tokenInfo || !tokenInfo.totalTokens || !tokenInfo.usedTokens) {
+    return 'blue' // 默认蓝色
+  }
+  
+  const usagePercentage = (tokenInfo.usedTokens / tokenInfo.totalTokens) * 100
+  
+  // 使用量达到90%时显示红色
+  if (usagePercentage >= 90) {
+    return 'red'
+  }
+  
+  // 使用量达到70%时显示橙色
+  if (usagePercentage >= 70) {
+    return 'orange'
+  }
+  
+  // 默认蓝色
+  return 'blue'
 }
 
 // 组件挂载时获取token信息

@@ -72,18 +72,6 @@ public class User implements Serializable {
     private String userRole;
 
     /**
-     * 用户总token额度
-     */
-    @Column("totalTokens")
-    private Long totalTokens;
-
-    /**
-     * 已使用token数量
-     */
-    @Column("usedTokens")
-    private Long usedTokens;
-
-    /**
      * 编辑时间
      */
     @Column("editTime")
@@ -106,19 +94,5 @@ public class User implements Serializable {
      */
     @Column(value = "isDelete", isLogicDelete = true)
     private Integer isDelete;
-
-    /**
-     * 获取剩余token数量
-     * @return 剩余token数量
-     */
-    public Long getRemainingTokens() {
-        if (totalTokens == null) {
-            totalTokens = 50000L; // 默认额度
-        }
-        if (usedTokens == null) {
-            usedTokens = 0L;
-        }
-        return Math.max(0, totalTokens - usedTokens);
-    }
 
 }
