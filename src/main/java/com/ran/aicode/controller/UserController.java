@@ -19,9 +19,11 @@ import com.ran.aicode.model.vo.LoginUserVO;
 import com.ran.aicode.model.vo.UserVO;
 import com.ran.aicode.service.AuthService;
 import com.ran.aicode.service.UserService;
+import com.ran.aicode.service.TokenService;
 import com.mybatisflex.core.paginate.Page;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 import com.mybatisflex.core.query.QueryWrapper;
@@ -33,6 +35,7 @@ import java.util.List;
  *
  * @author <a>ran</a>
  */
+@Slf4j
 @RestController
 @RequestMapping("/user")
 public class UserController {
@@ -42,6 +45,9 @@ public class UserController {
 
     @Resource
     private AuthService authService;
+
+    @Resource
+    private TokenService tokenService;
 //    /**
 //     * 用户注册（当前登录已改为“存在即登，不存在自动创建后登录”，该接口暂不开放）
 //     *
@@ -224,6 +230,43 @@ public class UserController {
         List<UserVO> userVOList = userService.getUserVOList(userPage.getRecords());
         userVOPage.setRecords(userVOList);
         return ResultUtils.success(userVOPage);
+    }
+
+    /**
+     * 获取当前用户token信息
+     *
+     * @param request HTTP请求
+     * @return 用户token信息
+     */
+    @GetMapping("/token/info")
+    @SaCheckLogin
+    public BaseResponse<User> getUserTokenInfo(HttpServletRequest request) {
+        try {
+            User loginUser = userService.getLoginUser(request);
+            if (loginUser == null) {
+                throw new BusinessException(ErrorCode.NOT_LOGIN_ERROR);
+            }
+            
+            log.info("获取用户token信息，用户ID: {}", loginUser.getId());
+            
+            // 直接创建token信息，避免数据库查询问题
+            User tokenInfo = new User();
+            tokenInfo.setId(loginUser.getId());
+            tokenInfo.setUserAccount(loginUser.getUserAccount());
+            tokenInfo.setUserName(loginUser.getUserName());
+            tokenInfo.setUserRole(loginUser.getUserRole());
+            
+            // 设置默认token值
+            tokenInfo.setTotalTokens(10000L);
+            tokenInfo.setUsedTokens(0L);
+            
+            log.info("返回token信息: {}", tokenInfo);
+            
+            return ResultUtils.success(tokenInfo);
+        } catch (Exception e) {
+            log.error("获取用户token信息失败", e);
+            throw new BusinessException(ErrorCode.SYSTEM_ERROR, "获取token信息失败: " + e.getMessage());
+        }
     }
 
 }

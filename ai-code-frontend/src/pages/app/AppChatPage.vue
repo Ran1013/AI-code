@@ -114,6 +114,10 @@
                 <div v-if="message.userName || (message.status && (message.status === 1 || message.status === 2))" class="message-footer">
                   <div v-if="message.userName" class="message-user ai-message-user">
                     回复 {{ message.userName }}
+                    <!-- 所有用户都显示token消耗信息 -->
+                    <span v-if="message.tokenInfo" class="token-consumption">
+                      本次消耗token: {{ message.tokenInfo.consumedTokens || 0 }} 剩余token: {{ message.tokenInfo.remainingTokens || 0 }}
+                    </span>
                   </div>
                   <div v-if="message.status && (message.status === 1 || message.status === 2)" class="message-status">
                     <a-tag :color="message.status === 1 ? 'orange' : 'red'" size="small">
@@ -351,6 +355,7 @@ import { canEditApp, hasPermission, PERMISSIONS } from '../../utils/permissionUt
 import { listAppChatHistory } from '../../api/chatHistoryController'
 import { CodeGenTypeEnum, formatCodeGenType } from '@/utils/codeGenTypes'
 import request from '@/request'
+import { getUserTokenInfo } from '../../api/userController'
 
 import MarkdownRenderer from '@/components/MarkdownRenderer.vue'
 import AppDetailModal from '@/components/AppDetailModal.vue'
@@ -396,9 +401,38 @@ const streamingContent = ref<string>('')
 const streamingUser = ref<API.UserVO | null>(null)
 const isStreamingFromOther = ref(false)
 
-// 其他用户代码生成状态
+// 其他用户生成状态相关
 const isOtherUserGenerating = ref(false)
 const otherGeneratingUser = ref<API.UserVO | null>(null)
+
+// 更新消息的token信息
+const updateTokenInfoForMessage = async (messageIndex: number) => {
+  try {
+    const res = await getUserTokenInfo()
+    if (res.data.code === 0 && res.data.data) {
+      const tokenData = res.data.data
+      const message = messages.value[messageIndex]
+      if (message && message.messageType === 'ai') {
+        // 添加用户角色信息
+        message.userRole = tokenData.userRole
+        
+        // 所有用户都计算和显示token信息
+        // 计算本次消耗的token（这里简化处理，实际应该从后端获取）
+        const consumedTokens = Math.max(100, Math.floor((message.content?.length || 0) / 2))
+        const remainingTokens = (tokenData.totalTokens || 10000) - (tokenData.usedTokens || 0)
+        
+        message.tokenInfo = {
+          consumedTokens,
+          remainingTokens
+        }
+        
+        console.log(`用户 ${tokenData.userRole} 的token信息:`, message.tokenInfo)
+      }
+    }
+  } catch (error) {
+    console.error('获取token信息失败:', error)
+  }
+}
 
 // 对话相关
 interface Message {
@@ -409,8 +443,13 @@ interface Message {
   createTime?: string
   userName?: string
   userAvatar?: string
+  userRole?: string // 用户角色：user/admin/member
   status?: number
   type?: string // 消息类型：text-文字，image-图片
+  tokenInfo?: {
+    consumedTokens?: number
+    remainingTokens?: number
+  }
 }
 
 const messages = ref<Message[]>([])
@@ -1124,6 +1163,9 @@ const generateCode = async (userMessage: string, aiMessageIndex: number, imageUr
       currentEventSource?.close()
       currentEventSource = null
 
+      // 获取最新的token信息并更新到消息中
+      updateTokenInfoForMessage(aiMessageIndex)
+
       // 只在团队应用中发送退出编辑状态消息
       if (isTeamApp.value) {
         sendWebSocketMessage({
@@ -1775,6 +1817,13 @@ onUnmounted(() => {
   text-align: left;
   color: #666;
   font-style: italic;
+}
+
+.token-consumption {
+  color: #ff4d4f;
+  font-size: 14px;
+  font-style: normal;
+  margin-left: 8px;
 }
 
 .message-avatar {

@@ -24,6 +24,7 @@ import com.ran.aicode.model.entity.User;
 import com.ran.aicode.model.enums.*;
 import com.ran.aicode.model.vo.AppVO;
 import com.ran.aicode.service.*;
+import com.ran.aicode.service.TokenService;
 import com.jd.platform.hotkey.client.callback.JdHotKeyStore;
 import com.mybatisflex.core.query.QueryWrapper;
 import com.mybatisflex.spring.service.impl.ServiceImpl;
@@ -81,6 +82,9 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
     @Resource
     private AiCodeGeneratorServiceFactory aiCodeGeneratorServiceFactory;
 
+    @Resource
+    private TokenService tokenService;
+
     @Override
     public Flux<String> chatToGenCode(Long appId, String message, User loginUser, List<String> images) {
         // 1. 参数校验
@@ -95,7 +99,16 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         if (!appUserService.hasAppPermission(appId, loginUser.getId())) {
             throw new BusinessException(ErrorCode.NO_AUTH_ERROR, "无权限访问该应用");
         }
-        // 4. 获取应用的代码生成类型
+        
+        // 4. 检查用户token额度（管理员和会员不受限制）
+        if (!tokenService.isAdminUser(loginUser.getId())) {
+            // 预估需要消耗的token数量（可以根据消息长度估算）
+            Long estimatedTokens = Math.max(100L, message.length() / 2); // 简单估算
+            if (!tokenService.hasEnoughTokens(loginUser.getId(), estimatedTokens)) {
+                throw new BusinessException(ErrorCode.NO_AUTH_ERROR, "Token额度不足，请联系管理员充值");
+            }
+        }
+        // 5. 获取应用的代码生成类型
         String codeGenTypeStr = app.getCodeGenType();
         CodeGenTypeEnum codeGenTypeEnum = CodeGenTypeEnum.getEnumByValue(codeGenTypeStr);
         if (codeGenTypeEnum == null) {
@@ -103,13 +116,13 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         }
         log.info("chatToGenCode AI回复:  appId:{}", appId);
 
-        // 5. 构建包含图片的完整消息
+        // 6. 构建包含图片的完整消息
         String fullMessage = buildMessageWithImages(message, images);
 
-        // 6. 在调用 AI 前，先保存用户消息到数据库中
+        // 7. 在调用 AI 前，先保存用户消息到数据库中
         chatHistoryService.addChatMessage(appId, message, ChatHistoryMessageTypeEnum.USER.getValue(), loginUser.getId(), ChatHistoryStatusEnum.NORMAL.getValue(), images);
 
-        // 7. 调用 AI 生成代码（流式）
+        // 8. 调用 AI 生成代码（流式）
         Flux<String> codeStream;
         if (loginUser.getUserRole().equals(UserRoleEnum.MEMBER.getValue())) {
             //会员

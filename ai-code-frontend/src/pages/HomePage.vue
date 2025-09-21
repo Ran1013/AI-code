@@ -166,12 +166,12 @@ const handleLike = async (appId: string | number | undefined, liked: boolean) =>
     let success = false
     if (liked) {
       // 点赞
-      const res = await likeApp({ appId: Number(appId) })
-      success = res.data.code === 0 && res.data.data
+      const res = await likeApp({ appId: String(appId) })
+      success = res.data.code === 0 && Boolean(res.data.data)
     } else {
       // 取消点赞
-      const res = await unlikeApp({ appId: Number(appId) })
-      success = res.data.code === 0 && res.data.data
+      const res = await unlikeApp({ appId: String(appId) })
+      success = res.data.code === 0 && Boolean(res.data.data)
     }
 
     if (success) {
@@ -189,7 +189,11 @@ const handleLike = async (appId: string | number | undefined, liked: boolean) =>
 }
 
 // 页面加载时获取数据
-onMounted(() => {
+onMounted(async () => {
+  console.log('首页挂载，当前用户信息:', loginUserStore.loginUser)
+  // 先获取用户登录信息
+  await loginUserStore.fetchLoginUser()
+  console.log('获取用户信息后:', loginUserStore.loginUser)
   loadMyApps()
   loadTeamApps()
 })

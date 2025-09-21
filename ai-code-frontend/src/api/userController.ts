@@ -154,3 +154,11 @@ export async function sendVerifyCode(
     ...(options || {}),
   })
 }
+
+/** 获取当前用户token信息 GET /user/token/info */
+export async function getUserTokenInfo(options?: { [key: string]: any }) {
+  return request<API.BaseResponseUser>('/user/token/info', {
+    method: 'GET',
+    ...(options || {}),
+  })
+}

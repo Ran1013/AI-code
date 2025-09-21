@@ -8,6 +8,7 @@ import AppManagePage from '@/pages/admin/AppManagePage.vue'
 import AppChatPage from '@/pages/app/AppChatPage.vue'
 import AppEditPage from '@/pages/app/AppEditPage.vue'
 import AppDetailPage from '@/pages/app/AppDetailPage.vue'
+import TestPage from '@/pages/TestPage.vue'
 
 
 const router = createRouter({
@@ -58,6 +59,11 @@ const router = createRouter({
       path: '/app/detail/:id',
       name: '应用详情',
       component: AppDetailPage,
+    },
+    {
+      path: '/test',
+      name: '测试页面',
+      component: TestPage,
     },
 
   ],

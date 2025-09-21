@@ -14,6 +14,7 @@ import com.ran.aicode.core.saver.CodeFileSaverExecutor;
 import com.ran.aicode.exception.BusinessException;
 import com.ran.aicode.exception.ErrorCode;
 import com.ran.aicode.model.enums.CodeGenTypeEnum;
+import com.ran.aicode.service.TokenService;
 import dev.langchain4j.model.chat.response.ChatResponse;
 import dev.langchain4j.service.TokenStream;
 import dev.langchain4j.service.tool.ToolExecution;
@@ -41,6 +42,9 @@ public class AiCodeGeneratorFacade {
 
     @Resource
     private VueProjectBuilder vueProjectBuilder;
+
+    @Resource
+    private TokenService tokenService;
 //
 //    /**
 //     * 统一入口：根据类型生成并保存代码
@@ -227,6 +231,28 @@ public class AiCodeGeneratorFacade {
                         sink.next(JSONUtil.toJsonStr(toolExecutedMessage));
                     })
                     .onCompleteResponse((ChatResponse response) -> {
+                        // 统计并更新用户token消耗
+                        try {
+                            dev.langchain4j.model.output.TokenUsage tokenUsage = response.metadata().tokenUsage();
+                            if (tokenUsage != null) {
+                                // 计算总token消耗（input + output）
+                                Long inputTokens = tokenUsage.inputTokenCount() != null ? tokenUsage.inputTokenCount() : 0L;
+                                Long outputTokens = tokenUsage.outputTokenCount() != null ? tokenUsage.outputTokenCount() : 0L;
+                                Long consumedTokens = inputTokens + outputTokens;
+                                
+                                if (consumedTokens > 0) {
+                                    boolean success = tokenService.consumeTokens(userId, consumedTokens);
+                                    if (success) {
+                                        log.info("用户 {} 消耗token成功，消耗: {}", userId, consumedTokens);
+                                    } else {
+                                        log.warn("用户 {} 消耗token失败，消耗: {}", userId, consumedTokens);
+                                    }
+                                }
+                            }
+                        } catch (Exception e) {
+                            log.error("统计用户token消耗失败: userId={}, error={}", userId, e.getMessage(), e);
+                        }
+
                         // 执行 Vue 项目构建（同步执行，确保预览时项目已就绪）
                         String projectPath = AppConstant.CODE_OUTPUT_ROOT_DIR + "/vue_project_" + appId;
                         vueProjectBuilder.buildProject(projectPath);
