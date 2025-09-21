@@ -2,22 +2,18 @@ package com.ran.aicode.controller;
 
 
 import com.ran.aicode.common.BaseResponse;
-import com.ran.aicode.common.PageRequest;
 import com.ran.aicode.common.ResultUtils;
 import com.ran.aicode.exception.ErrorCode;
 import com.ran.aicode.exception.ThrowUtils;
-import com.ran.aicode.model.entity.Thumb;
 import com.ran.aicode.model.entity.User;
 import com.ran.aicode.model.vo.AppThumbVO;
 import com.ran.aicode.service.ThumbService;
 import com.ran.aicode.service.UserService;
-import com.mybatisflex.core.paginate.Page;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.Set;
 
 /**
  *  控制层。

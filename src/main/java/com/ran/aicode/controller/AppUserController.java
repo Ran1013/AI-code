@@ -1,10 +1,8 @@
 package com.ran.aicode.controller;
 
 import cn.dev33.satoken.annotation.SaCheckLogin;
-import cn.dev33.satoken.annotation.SaCheckRole;
 import com.ran.aicode.common.BaseResponse;
 import com.ran.aicode.common.ResultUtils;
-import com.ran.aicode.constant.UserConstant;
 import com.ran.aicode.exception.ErrorCode;
 import com.ran.aicode.exception.ThrowUtils;
 import com.ran.aicode.manager.auth.annotation.SaSpaceCheckPermission;

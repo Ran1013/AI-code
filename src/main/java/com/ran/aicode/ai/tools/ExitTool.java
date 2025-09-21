@@ -28,10 +28,10 @@ public class ExitTool extends BaseTool {
      *
      * @return 退出确认信息
      */
-    @Tool("当任务已完成或无需继续调用工具时，使用此工具退出操作，防止循环")
+    @Tool("当任务已完成或无需继续调用工具时，使用此工具退出操作，防止循环。调用此工具后，AI应该立即停止所有工具调用并输出最终结果。")
     public String exit() {
         log.info("AI 请求退出工具调用");
-        return "不要继续调用工具，可以输出最终结果了";
+        return "任务已完成，请立即停止所有工具调用并输出最终结果。不要再调用任何工具。";
     }
 
     @Override

@@ -3,7 +3,6 @@ package com.ran.aicode.websocket;
 import cn.hutool.core.collection.CollUtil;
 import cn.hutool.json.JSONUtil;
 import com.ran.aicode.model.entity.User;
-import com.ran.aicode.model.enums.ChatHistoryMessageTypeEnum;
 import com.ran.aicode.service.UserService;
 import com.ran.aicode.websocket.disruptor.AppEventProducer;
 import com.ran.aicode.websocket.model.AppMessageTypeEnum;
@@ -11,6 +10,8 @@ import com.ran.aicode.websocket.model.AppRequestMessage;
 import com.ran.aicode.websocket.model.AppResponseMessage;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.module.SimpleModule;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
@@ -20,8 +21,6 @@ import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
-import org.springframework.http.codec.ServerSentEvent;
-import reactor.core.publisher.Flux;
 
 import java.io.IOException;
 import java.util.Map;
@@ -240,6 +239,9 @@ public class AppEditHandler extends TextWebSocketHandler {
         module.addSerializer(Long.class, ToStringSerializer.instance);
         module.addSerializer(Long.TYPE, ToStringSerializer.instance); // 支持 long 基本类型
         objectMapper.registerModule(module);
+        // 支持 Java8 时间类型序列化
+        objectMapper.registerModule(new JavaTimeModule());
+        objectMapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
         // 序列化为 JSON 字符串
         String message = objectMapper.writeValueAsString(appResponseMessage);
         TextMessage textMessage = new TextMessage(message);

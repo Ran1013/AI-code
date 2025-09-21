@@ -1,8 +1,8 @@
 package com.ran.aicode.model.vo;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
-import com.mybatisflex.annotation.Column;
 import lombok.Data;
 
 import java.io.Serializable;
@@ -47,6 +47,7 @@ public class AppVO implements Serializable {
     /**
      * 部署时间
      */
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime deployedTime;
 
     /**
@@ -78,11 +79,13 @@ public class AppVO implements Serializable {
     /**
      * 创建时间
      */
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime createTime;
 
     /**
      * 更新时间
      */
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime updateTime;
 
     /**
@@ -94,6 +97,11 @@ public class AppVO implements Serializable {
      * 权限列表
      */
     private List<String> permissionList = new ArrayList<>();
+
+    /**
+     * 创建者信息（脱敏）
+     */
+    private UserVO user;
 
     private static final long serialVersionUID = 1L;
 } 

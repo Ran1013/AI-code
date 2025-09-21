@@ -64,7 +64,7 @@ const createApp = async () => {
   creating.value = true
   try {
 
-    
+
     const res = await addApp({
       initPrompt: userPrompt.value,
     })
@@ -209,11 +209,9 @@ onMounted(() => {
       <!-- 输入区域 -->
       <div class="input-section">
         <div class="input-container">
-
-    
           <a-textarea
             v-model:value="userPrompt"
-            placeholder="使用 ran AI 创建一个应用........"
+            placeholder="使用 AI 创建一个应用........"
             :rows="3"
             :maxlength="1000"
             class="prompt-input"
@@ -223,10 +221,10 @@ onMounted(() => {
               <!-- 左侧可以放置其他操作按钮 -->
             </div>
             <div class="right-actions">
-              <a-button 
-                type="primary" 
-                size="large" 
-                @click="createApp" 
+              <a-button
+                type="primary"
+                size="large"
+                @click="createApp"
                 :loading="creating"
                 class="submit-btn"
               >
@@ -237,27 +235,44 @@ onMounted(() => {
             </div>
           </div>
         </div>
-        
-
       </div>
 
       <!-- 快捷模板 -->
       <div class="template-section">
+        <div class="template-header">
+          <h3 class="template-title">🚀 快速开始</h3>
+          <p class="template-subtitle">选择一个模板，快速创建您的应用</p>
+        </div>
         <div class="template-grid">
-          <a-button
-            type="default"
-            class="template-btn"
-            @click="setPrompt('创建一个现代化的个人博客网站，包含文章列表、分类标签、评论系统、搜索功能等')"
-          >
-            个人博客网站
-          </a-button>
-          <a-button
-            type="default"
-            class="template-btn"
-            @click="setPrompt('设计一个专业的企业官网，包含公司介绍、产品服务、团队介绍、联系我们等页面')"
-          >
-            企业官网
-          </a-button>
+          <div class="template-card" @click="setPrompt('创建一个简单的个人介绍页面，包含个人照片、基本信息、技能展示、联系方式，使用单个HTML文件，内联CSS和JS样式。要求：代码简洁，功能完整，避免冗余代码。')">
+            <div class="template-icon">📄</div>
+            <div class="template-content">
+              <h4 class="template-name">个人介绍页面</h4>
+              <p class="template-desc">简单静态页面，单文件展示</p>
+              <div class="template-mode">HTML 模式</div>
+            </div>
+            <div class="template-arrow">→</div>
+          </div>
+          
+          <div class="template-card" @click="setPrompt('设计一个多页面的企业展示网站，包含首页、关于我们、产品介绍、联系我们等页面，使用分离的HTML、CSS、JS文件结构。要求：代码精简，功能实用，避免过度设计。')">
+            <div class="template-icon">🏢</div>
+            <div class="template-content">
+              <h4 class="template-name">企业展示网站</h4>
+              <p class="template-desc">多页面静态网站，文件分离</p>
+              <div class="template-mode">多文件模式</div>
+            </div>
+            <div class="template-arrow">→</div>
+          </div>
+          
+          <div class="template-card" @click="setPrompt('构建一个现代化的Vue3电商应用，包含商品列表、购物车、用户登录、订单管理、商品搜索、分类筛选等复杂功能，使用Vue Router、状态管理、组件化开发。要求：代码简洁高效，功能完整，避免冗余组件和复杂逻辑，优先核心功能。')">
+            <div class="template-icon">🛒</div>
+            <div class="template-content">
+              <h4 class="template-name">Vue电商应用</h4>
+              <p class="template-desc">复杂交互应用，Vue3工程化</p>
+              <div class="template-mode">Vue工程模式</div>
+            </div>
+            <div class="template-arrow">→</div>
+          </div>
         </div>
       </div>
 
@@ -326,8 +341,6 @@ onMounted(() => {
           />
         </div>
       </div>
-
-
     </div>
   </div>
 </template>
@@ -611,35 +624,128 @@ onMounted(() => {
   margin-bottom: 60px;
 }
 
-.template-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 20px;
-  max-width: 600px;
-  margin: 0 auto;
+.template-header {
+  text-align: center;
+  margin-bottom: 40px;
 }
 
-.template-btn {
-  height: 56px;
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.9);
-  border: 1px solid rgba(24, 144, 255, 0.15);
-  color: #333;
-  font-weight: 500;
-  font-size: 14px;
-  transition: all 0.3s ease;
-  backdrop-filter: blur(10px);
+.template-title {
+  font-size: 24px;
+  font-weight: 600;
+  margin: 0 0 8px;
+  color: #1a1a1a;
   display: flex;
   align-items: center;
   justify-content: center;
+  gap: 8px;
 }
 
-.template-btn:hover {
+.template-subtitle {
+  font-size: 16px;
+  color: #666;
+  margin: 0;
+  font-weight: 400;
+}
+
+.template-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 24px;
+  max-width: 1000px;
+  margin: 0 auto;
+}
+
+.template-card {
   background: rgba(255, 255, 255, 0.95);
-  border-color: rgba(24, 144, 255, 0.3);
+  border: 1px solid rgba(24, 144, 255, 0.1);
+  border-radius: 20px;
+  padding: 24px;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  backdrop-filter: blur(20px);
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-height: 100px;
+}
+
+.template-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(135deg, rgba(24, 144, 255, 0.02) 0%, rgba(64, 169, 255, 0.02) 100%);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  z-index: 0;
+}
+
+.template-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 40px rgba(24, 144, 255, 0.15);
+  border-color: rgba(24, 144, 255, 0.2);
+}
+
+.template-card:hover::before {
+  opacity: 1;
+}
+
+.template-card:hover .template-arrow {
+  transform: translateX(4px);
   color: #1890ff;
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(24, 144, 255, 0.15);
+}
+
+.template-icon {
+  font-size: 32px;
+  flex-shrink: 0;
+  z-index: 1;
+  position: relative;
+}
+
+.template-content {
+  flex: 1;
+  z-index: 1;
+  position: relative;
+}
+
+.template-name {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0 0 8px;
+  color: #1a1a1a;
+  line-height: 1.3;
+}
+
+.template-desc {
+  font-size: 14px;
+  color: #666;
+  margin: 0 0 8px;
+  line-height: 1.4;
+}
+
+.template-mode {
+  display: inline-block;
+  background: linear-gradient(135deg, #1890ff 0%, #40a9ff 100%);
+  color: white;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 4px 8px;
+  border-radius: 6px;
+  margin: 0;
+  line-height: 1;
+}
+
+.template-arrow {
+  font-size: 20px;
+  color: #999;
+  transition: all 0.3s ease;
+  flex-shrink: 0;
+  z-index: 1;
+  position: relative;
 }
 
 /* 区域标题 */
@@ -733,29 +839,60 @@ onMounted(() => {
   .container {
     padding: 20px 16px;
   }
-  
+
   .hero-title {
     font-size: 32px;
   }
-  
+
   .hero-subtitle {
     font-size: 16px;
   }
-  
+
   .input-container {
     padding: 24px 20px;
   }
-  
+
   .template-grid {
     grid-template-columns: 1fr;
     max-width: 100%;
+    gap: 16px;
   }
-  
-  .template-btn {
-    height: 48px;
+
+  .template-card {
+    padding: 20px;
+    min-height: 80px;
+    gap: 12px;
+  }
+
+  .template-icon {
+    font-size: 28px;
+  }
+
+  .template-name {
+    font-size: 16px;
+  }
+
+  .template-desc {
     font-size: 13px;
   }
-  
+
+  .template-mode {
+    font-size: 11px;
+    padding: 3px 6px;
+  }
+
+  .template-arrow {
+    font-size: 18px;
+  }
+
+  .template-title {
+    font-size: 20px;
+  }
+
+  .template-subtitle {
+    font-size: 14px;
+  }
+
   .submit-btn {
     width: 48px !important;
     height: 48px !important;
@@ -764,39 +901,39 @@ onMounted(() => {
     max-width: 48px !important;
     max-height: 48px !important;
   }
-  
+
   .submit-icon {
     font-size: 18px;
   }
-  
+
   .app-grid {
     grid-template-columns: 1fr;
   }
-  
+
   .section-title {
     font-size: 24px;
   }
-  
+
   .section-header {
     flex-direction: column;
     gap: 16px;
     align-items: flex-start;
   }
-  
+
   .team-link {
     align-self: flex-end;
   }
-  
+
   .input-actions {
     flex-direction: column;
     gap: 16px;
     align-items: stretch;
   }
-  
+
   .right-actions {
     justify-content: center;
   }
-  
+
   .mode-select {
     min-width: 120px;
   }

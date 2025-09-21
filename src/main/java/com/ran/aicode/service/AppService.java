@@ -1,17 +1,13 @@
 package com.ran.aicode.service;
 
-import com.ran.aicode.common.BaseResponse;
-import com.ran.aicode.common.DeleteRequest;
 import com.ran.aicode.model.dto.app.AppAddRequest;
 import com.ran.aicode.model.dto.app.AppQueryRequest;
 import com.ran.aicode.model.entity.App;
 import com.ran.aicode.model.entity.User;
-import com.ran.aicode.model.vo.AppThumbDetailVO;
 import com.ran.aicode.model.vo.AppVO;
 import com.mybatisflex.core.query.QueryWrapper;
 import com.mybatisflex.core.service.IService;
 import jakarta.servlet.http.HttpServletRequest;
-import org.springframework.web.bind.annotation.RequestBody;
 import reactor.core.publisher.Flux;
 
 import java.util.List;

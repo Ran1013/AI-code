@@ -1,31 +1,21 @@
 package com.ran.aicode.job;
 
 import cn.hutool.core.collection.CollUtil;
-import cn.hutool.core.date.DateTime;
-import cn.hutool.core.date.DateUtil;
 import cn.hutool.core.text.StrPool;
 
-import cn.hutool.core.util.ObjUtil;
-import com.ran.aicode.constant.ThumbConstant;
 import com.ran.aicode.mapper.AppMapper;
 import com.ran.aicode.mapper.ThumbMapper;
 import com.ran.aicode.model.entity.Thumb;
 import com.ran.aicode.model.enums.ThumbTypeEnum;
-import com.ran.aicode.service.AppService;
 
 import com.ran.aicode.service.ThumbService;
 import com.ran.aicode.utils.RedisKeyUtil;
-import com.mybatisflex.core.query.QueryWrapper;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.util.*;
-
-import static com.ran.aicode.constant.ThumbConstant.TEMP_THUMB_KEY_PREFIX;
 
 /**
  * 定时将 Redis 中的临时点赞数据同步到数据库

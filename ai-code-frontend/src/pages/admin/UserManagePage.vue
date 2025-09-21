@@ -36,7 +36,8 @@
           </div>
         </template>
         <template v-else-if="column.dataIndex === 'createTime'">
-          {{ dayjs(record.createTime).format('YYYY-MM-DD HH:mm:ss') }}
+          <span v-if="record.createTime">{{ formatTime(record.createTime) }}</span>
+          <span v-else class="text-gray">-</span>
         </template>
         <template v-else-if="column.key === 'action'">
           <a-space>
@@ -55,6 +56,10 @@
       @cancel="handleEditCancel"
       :confirmLoading="editLoading"
     >
+      <template #footer>
+        <a-button type="primary" :loading="editLoading" @click="handleEditOk">确定</a-button>
+        <a-button @click="handleEditCancel">取消</a-button>
+      </template>
       <a-form :model="editForm" layout="vertical">
         <a-form-item label="用户ID">
           <a-input v-model:value="editForm.id" disabled />
@@ -83,7 +88,7 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { deleteUser, listUserVoByPage, updateUserAdmin } from '../../api/userController'
 import { message } from 'ant-design-vue'
-import dayjs from 'dayjs'
+import { formatTime } from '@/utils/time'
 
 const columns = [
   {

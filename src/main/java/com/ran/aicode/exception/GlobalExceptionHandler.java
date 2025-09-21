@@ -1,8 +1,6 @@
 package com.ran.aicode.exception;
 
 
-import cn.dev33.satoken.exception.NotLoginException;
-import cn.dev33.satoken.exception.NotPermissionException;
 import cn.hutool.json.JSONUtil;
 import com.ran.aicode.common.BaseResponse;
 import com.ran.aicode.common.ResultUtils;

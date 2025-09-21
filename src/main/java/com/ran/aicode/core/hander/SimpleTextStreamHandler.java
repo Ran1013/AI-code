@@ -7,8 +7,6 @@ import com.ran.aicode.service.ChatHistoryService;
 import lombok.extern.slf4j.Slf4j;
 import reactor.core.publisher.Flux;
 
-import java.util.concurrent.atomic.AtomicBoolean;
-
 /**
  * 简单文本流处理器
  * 处理 HTML 和 MULTI_FILE 类型的流式响应

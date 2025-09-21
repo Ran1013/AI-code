@@ -42,9 +42,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
-import com.ran.aicode.model.vo.AppThumbDetailVO;
-import com.ran.aicode.service.ThumbService;
-
 /**
  * 应用 服务层实现。
  *
@@ -323,6 +320,17 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         }
         AppVO appVO = new AppVO();
         BeanUtil.copyProperties(app, appVO);
+        // 追加创建者信息
+        try {
+            if (app.getUserId() != null) {
+                User creator = userService.getById(app.getUserId());
+                if (creator != null) {
+                    appVO.setUser(userService.getUserVO(creator));
+                }
+            }
+        } catch (Exception ignore) {
+            // 保底：不影响主流程
+        }
         return appVO;
     }
 
@@ -370,10 +378,12 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         String appName = appQueryRequest.getAppName();
         String codeGenType = appQueryRequest.getCodeGenType();
         Long userId = appQueryRequest.getUserId();
+        String creatorKeyword = appQueryRequest.getCreatorKeyword();
         Integer priority = appQueryRequest.getPriority();
         String sortField = appQueryRequest.getSortField();
         String sortOrder = appQueryRequest.getSortOrder();
         Integer isPublic = appQueryRequest.getIsPublic();
+        Integer isTeam = appQueryRequest.getIsTeam();
 
         QueryWrapper queryWrapper = QueryWrapper.create();
 
@@ -393,8 +403,28 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         if (isPublic != null) {
             queryWrapper.eq("isPublic", isPublic);
         }
+        if (isTeam != null) {
+            queryWrapper.eq("isTeam", isTeam);
+        }
         if (StrUtil.isNotBlank(appName)) {
             queryWrapper.like("appName", appName);
+        }
+
+        // 处理创建者关键字（ID/账号/用户名）。仅当未显式传 userId 时生效
+        if (userId == null && StrUtil.isNotBlank(creatorKeyword)) {
+            // 尝试解析为数字ID
+            Long parsedId = null;
+            try {
+                parsedId = Long.valueOf(creatorKeyword.trim());
+            } catch (Exception ignore) {}
+
+            if (parsedId != null) {
+                queryWrapper.and("userId = ?", parsedId);
+            } else {
+                // 根据账号或用户名模糊匹配用户ID集合（使用子查询占位符避免获取参数列表的方法依赖）
+                String likeKw = "%" + creatorKeyword + "%";
+                queryWrapper.and("userId in (select id from `user` where userAccount like ? or userName like ?)", likeKw, likeKw);
+            }
         }
 
         // 排序
@@ -415,6 +445,7 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
      * @param appId 应用 ID
      * @return App 实体，可能为 null
      */
+    @Override
     public App getAppByIdWithHotKey(Long appId) {
         String cacheKey = ThumbConstant.APP_ID_HOTKEY_PREFIX + appId;
         if (JdHotKeyStore.isHotKey(cacheKey)) {

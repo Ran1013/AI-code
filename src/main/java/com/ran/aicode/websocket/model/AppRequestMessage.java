@@ -3,8 +3,6 @@ package com.ran.aicode.websocket.model;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import org.springframework.http.codec.ServerSentEvent;
-import reactor.core.publisher.Flux;
 
 /**
  * 图片编辑请求消息

@@ -3,31 +3,33 @@ package com.ran.aicode.service.impl;
 import cn.hutool.core.date.DateUtil;
 import cn.hutool.core.util.RandomUtil;
 import cn.hutool.core.util.StrUtil;
-import com.ran.aicode.config.MailConfig;
+import com.ran.aicode.config.TencentCloudConfig;
 import com.ran.aicode.exception.BusinessException;
 import com.ran.aicode.exception.ErrorCode;
+import com.ran.aicode.model.entity.User;
 import com.ran.aicode.service.AuthService;
+import com.ran.aicode.service.TencentEmailService;
+import com.ran.aicode.service.UserService;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.mail.SimpleMailMessage;
-import org.springframework.mail.javamail.JavaMailSender;
+// import org.springframework.mail.SimpleMailMessage; // 旧代码依赖，已注释
+// import org.springframework.mail.javamail.JavaMailSender; // 旧代码依赖，已注释
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
-import com.ran.aicode.model.entity.User;
-import com.ran.aicode.service.UserService;
 
 @Service
 @Slf4j
 public class AuthServiceImpl implements AuthService {
 
-    private static final String VERIFY_CODE_PREFIX = "verify:code:"; // verify:code:{email}
-    private static final String VERIFY_FAIL_COUNT_PREFIX = "verify:fail:"; // verify:fail:{email}
-    private static final String SEND_COUNT_PREFIX = "verify:send:"; // verify:send:{email}:{hour}
+    private static final String VERIFY_CODE_PREFIX = "verify:code:";
+    private static final String VERIFY_FAIL_COUNT_PREFIX = "verify:fail:";
+    private static final String SEND_COUNT_PREFIX = "verify:send:";
 
     private static final int CODE_TTL_MINUTES = 15;
     private static final int MAX_SEND_PER_EMAIL_PER_HOUR = 3;
@@ -37,14 +39,20 @@ public class AuthServiceImpl implements AuthService {
     private RedisTemplate<String, Object> redisTemplate;
 
     @Resource
-    private JavaMailSender mailSender;
+    private TencentCloudConfig tencentCloudConfig;
 
-    @Value("${spring.mail.from}")
-    private String fromEmail;
+    @Resource
+    private TencentEmailService tencentEmailService; // 注入新的邮件服务
 
     @Resource
     @Lazy
     private UserService userService;
+
+    // @Resource
+    // private JavaMailSender mailSender; // 旧代码依赖，已注释
+
+    // @Value("${spring.mail.from}")
+    // private String fromEmail; // 旧代码依赖，已注释
 
     @Override
     public void sendVerifyCode(String email) {
@@ -52,11 +60,9 @@ public class AuthServiceImpl implements AuthService {
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "邮箱不能为空");
         }
 
-        // 根据邮箱查找用户
         User user = userService.getUserByUserAccount(email);
         String nickname = user != null ? user.getUserName() : "用户";
 
-        // 频次限制：1小时内同邮箱最多3次
         String hourKey = DateUtil.format(DateUtil.date(), "yyyyMMddHH");
         String sendCountKey = SEND_COUNT_PREFIX + email + ":" + hourKey;
 
@@ -68,19 +74,29 @@ public class AuthServiceImpl implements AuthService {
             throw new BusinessException(ErrorCode.OPERATION_ERROR, "该邮箱接收过于频繁，请稍后再试");
         }
 
-        // 生成6位数字验证码
         String code = RandomUtil.randomNumbers(6);
-        
-        // 统一使用email存储验证码
+
         String codeKey = VERIFY_CODE_PREFIX + email;
         redisTemplate.opsForValue().set(codeKey, code, CODE_TTL_MINUTES, TimeUnit.MINUTES);
-        
-        // 清空失败计数
+
         String failKey = VERIFY_FAIL_COUNT_PREFIX + email;
         redisTemplate.delete(failKey);
 
-        // 发送邮件
-        sendMail(email, nickname, code, "LOGIN");
+        // --- 调用新的邮件服务 ---
+        Map<String, Object> templateData = new HashMap<>();
+        templateData.put("nickname", nickname);
+        templateData.put("code", code);
+        templateData.put("minutes", CODE_TTL_MINUTES);
+
+        tencentEmailService.sendTemplateEmail(
+                email,
+                "【安全验证】登录验证码",
+                tencentCloudConfig.getSes().getTemplateId(),
+                templateData
+        );
+        
+        // 旧的邮件发送调用
+        // sendMail(email, nickname, code, "LOGIN");
     }
 
     @Override
@@ -88,31 +104,28 @@ public class AuthServiceImpl implements AuthService {
         if (userId == null || userId <= 0 || StrUtil.isBlank(code)) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "参数错误");
         }
-        
-        // 获取用户邮箱
+
         User user = userService.getById(userId);
         if (user == null || StrUtil.isBlank(user.getUserAccount())) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "用户不存在或邮箱为空");
         }
-        
+
         String email = user.getUserAccount();
         String codeKey = VERIFY_CODE_PREFIX + email;
         Object cached = redisTemplate.opsForValue().get(codeKey);
-        
+
         if (cached == null) {
             throw new BusinessException(ErrorCode.OPERATION_ERROR, "验证码不存在或已过期");
         }
-        
+
         String cachedCode = String.valueOf(cached);
         if (!StrUtil.equals(cachedCode, code)) {
-            // 失败计数
             String failKey = VERIFY_FAIL_COUNT_PREFIX + email;
             Long fail = redisTemplate.opsForValue().increment(failKey);
             if (fail != null && fail == 1L) {
                 redisTemplate.expire(failKey, Duration.ofMinutes(CODE_TTL_MINUTES));
             }
             if (fail != null && fail >= MAX_VERIFY_FAIL) {
-                // 失效当前验证码并自动重发
                 redisTemplate.delete(codeKey);
                 redisTemplate.delete(failKey);
                 try {
@@ -124,20 +137,19 @@ public class AuthServiceImpl implements AuthService {
             }
             throw new BusinessException(ErrorCode.OPERATION_ERROR, "验证码错误");
         }
-        
-        // 校验通过，清理验证码
+
         redisTemplate.delete(codeKey);
         redisTemplate.delete(VERIFY_FAIL_COUNT_PREFIX + email);
         return true;
     }
 
-
+    /*
     private void sendMail(String email, String nickname, String code, String scene) {
         if (mailSender == null) {
             log.warn("未配置邮件发送，跳过实际发送，email={}, code={}", email, code);
             return;
         }
-        SimpleMailMessage message = new SimpleMailMessage();
+        org.springframework.mail.SimpleMailMessage message = new org.springframework.mail.SimpleMailMessage();
         message.setFrom(fromEmail);
         message.setTo(email);
         message.setSubject("【安全验证】登录验证码");
@@ -155,6 +167,5 @@ public class AuthServiceImpl implements AuthService {
             throw new BusinessException(ErrorCode.OPERATION_ERROR, "验证码发送失败，请检查邮箱是否正确或稍后再试");
         }
     }
+    */
 }
-
-

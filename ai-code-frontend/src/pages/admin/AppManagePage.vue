@@ -6,7 +6,7 @@
         <a-input v-model:value="searchParams.appName" placeholder="输入应用名称" />
       </a-form-item>
       <a-form-item label="创建者">
-        <a-input v-model:value="searchParams.userId" placeholder="输入用户ID" />
+        <a-input v-model:value="creatorKeyword" placeholder="输入用户ID/账号/用户名" />
       </a-form-item>
       <a-form-item label="应用属性">
         <a-select
@@ -81,7 +81,7 @@
           {{ formatTime(record.createTime) }}
         </template>
         <template v-else-if="column.dataIndex === 'user'">
-          <UserInfo :user="record.user" size="small" />
+          <UserInfo :user="userCache[record.userId]" size="small" />
         </template>
         <template v-else-if="column.key === 'action'">
           <a-space>
@@ -109,6 +109,7 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import { listAppByPage, deleteApp as deleteAppApi, updateApp } from '@/api/appController'
+import { getUserVoById } from '@/api/userController'
 import { CODE_GEN_TYPE_OPTIONS, formatCodeGenType } from '@/utils/codeGenTypes'
 import { formatTime } from '@/utils/time'
 import UserInfo from '@/components/UserInfo.vue'
@@ -178,12 +179,16 @@ const columns = [
 // 数据
 const data = ref<API.AppVO[]>([])
 const total = ref(0)
+// 用户缓存：userId => UserVO
+const userCache = reactive<Record<string, API.UserVO>>({})
 
 // 搜索条件
 const searchParams = reactive<API.AppQueryRequest>({
   pageNum: 1,
   pageSize: 10,
 })
+// 创建者搜索关键字（可输入 id/账号/用户名）
+const creatorKeyword = ref<string>('')
 
 // 获取数据
 const fetchData = async () => {
@@ -194,6 +199,8 @@ const fetchData = async () => {
     if (res.data.data) {
       data.value = res.data.data.records ?? []
       total.value = res.data.data.totalRow ?? 0
+      // 预加载创建者信息
+      await preloadCreators(data.value)
     } else {
       message.error('获取数据失败，' + res.data.message)
     }
@@ -227,9 +234,12 @@ const doTableChange = (page: { current: number; pageSize: number }) => {
 }
 
 // 搜索
-const doSearch = () => {
+const doSearch = async () => {
   // 重置页码
   searchParams.pageNum = 1
+  // 直接把关键字传给后端
+  ;(searchParams as any).creatorKeyword = creatorKeyword.value?.trim() || undefined
+  searchParams.userId = undefined
   fetchData()
 }
 
@@ -237,10 +247,31 @@ const doSearch = () => {
 const resetSearch = () => {
   searchParams.appName = undefined
   searchParams.userId = undefined
+  creatorKeyword.value = ''
   searchParams.isTeam = undefined
   searchParams.codeGenType = undefined
   searchParams.pageNum = 1
+  ;(searchParams as any).creatorKeyword = undefined
   fetchData()
+}
+
+// 预加载创建者信息，按 userId 拉取并缓存
+const preloadCreators = async (records: API.AppVO[]) => {
+  const ids = Array.from(new Set(records.map(r => r.userId).filter(Boolean))) as number[]
+  const need = ids.filter(id => !userCache[id as any])
+  if (need.length === 0) return
+  try {
+    await Promise.all(
+      need.map(async (id) => {
+        const res = await getUserVoById({ id })
+        if (res.data.code === 0 && res.data.data) {
+          userCache[id as any] = res.data.data
+        }
+      })
+    )
+  } catch (e) {
+    // 忽略单个失败
+  }
 }
 
 // 编辑应用

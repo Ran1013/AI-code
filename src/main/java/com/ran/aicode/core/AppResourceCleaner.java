@@ -4,7 +4,6 @@ import cn.hutool.core.io.FileUtil;
 import cn.hutool.core.util.StrUtil;
 import com.ran.aicode.constant.AppConstant;
 import com.ran.aicode.model.entity.App;
-import com.ran.aicode.model.enums.CodeGenTypeEnum;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 

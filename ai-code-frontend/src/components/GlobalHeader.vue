@@ -267,12 +267,12 @@ const doLogout = async () => {
   .header {
     padding: 0 16px;
   }
-  
+
   .logo-image {
     height: 28px;
   }
-  
-  
+
+
   .nav-menu {
     display: none;
   }

@@ -138,13 +138,10 @@ export async function updateUserAdmin(body: API.UserUpdateRequest, options?: { [
   })
 }
 
-/** 发送验证码 POST /auth/send-verify-code */
+/** 发送验证码 POST /user/sendVerify */
 export async function sendVerifyCode(
   body: {
-    userId: number
     email: string
-    nickname?: string
-    scene?: string // REGISTER / PWD_FAIL / LOGIN
   },
   options?: { [key: string]: any }
 ) {

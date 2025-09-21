@@ -111,9 +111,13 @@ public class OpenAiStreamingResponseBuilder {
         }
 
         if (delta.toolCalls() != null) {
-            System.out.println("OLOLO " + delta.toolCalls()); // TODO
+            System.out.println("=== 工具调用流式数据 ===");
+            System.out.println("工具调用详情: " + delta.toolCalls());
 
             for (ToolCall toolCall : delta.toolCalls()) {
+                System.out.println("处理工具调用: index=" + toolCall.index() + 
+                    ", id=" + toolCall.id() + 
+                    ", function=" + toolCall.function());
 
                 ToolExecutionRequestBuilder builder = this.indexToToolExecutionRequestBuilder.computeIfAbsent(
                         toolCall.index(),
@@ -122,15 +126,18 @@ public class OpenAiStreamingResponseBuilder {
 
                 if (toolCall.id() != null) {
                     builder.idBuilder.append(toolCall.id());
+                    System.out.println("累积ID: " + builder.idBuilder.toString());
                 }
 
                 FunctionCall functionCall = toolCall.function();
                 if (functionCall.name() != null) {
                     builder.nameBuilder.append(functionCall.name());
+                    System.out.println("累积名称: " + builder.nameBuilder.toString());
                 }
 
                 if (functionCall.arguments() != null) {
                     builder.argumentsBuilder.append(functionCall.arguments());
+                    System.out.println("累积参数: " + builder.argumentsBuilder.toString());
                 }
             }
         }
@@ -199,12 +206,21 @@ public class OpenAiStreamingResponseBuilder {
         }
 
         if (!indexToToolExecutionRequestBuilder.isEmpty()) {
+            System.out.println("构建工具调用请求，数量: " + indexToToolExecutionRequestBuilder.size());
+            
             List<ToolExecutionRequest> toolExecutionRequests = indexToToolExecutionRequestBuilder.values().stream()
-                    .map(it -> ToolExecutionRequest.builder()
-                            .id(it.idBuilder.toString())
-                            .name(it.nameBuilder.toString())
-                            .arguments(it.argumentsBuilder.toString())
-                            .build())
+                    .map(it -> {
+                        String id = it.idBuilder.toString();
+                        String name = it.nameBuilder.toString();
+                        String arguments = it.argumentsBuilder.toString();
+                        System.out.println("工具调用: id=" + id + ", name=" + name + ", arguments=" + arguments);
+                        
+                        return ToolExecutionRequest.builder()
+                                .id(id)
+                                .name(name)
+                                .arguments(arguments)
+                                .build();
+                    })
                     .collect(toList());
 
             AiMessage aiMessage = isNullOrBlank(text) ?

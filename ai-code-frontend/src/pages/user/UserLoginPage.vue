@@ -6,7 +6,7 @@
           <span class="logo-text">AI Code</span>
         </div>
         <h1 class="login-title">用户登录</h1>
-        <p class="login-subtitle">输入QQ邮箱和验证码即可登录</p>
+        <p class="login-subtitle">输入邮箱和验证码即可登录</p>
       </div>
       
       <a-form 
@@ -19,14 +19,14 @@
         <a-form-item 
           name="userAccount" 
           :rules="[
-            { required: true, message: '请输入QQ邮箱' },
+            { required: true, message: '请输入邮箱' },
             { type: 'email', message: '请输入正确的邮箱格式' }
           ]"
           class="form-item"
         >
           <a-input 
             v-model:value="formState.userAccount" 
-            placeholder="请输入QQ邮箱"
+            placeholder="请输入邮箱"
             size="large"
             class="form-input"
           >

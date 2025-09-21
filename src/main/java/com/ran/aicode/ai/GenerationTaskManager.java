@@ -1,8 +1,6 @@
 package com.ran.aicode.ai;
 
-import com.ran.aicode.model.enums.ChatHistoryMessageTypeEnum;
 import com.ran.aicode.service.ChatHistoryService;
-import com.mybatisflex.core.query.QueryWrapper;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;

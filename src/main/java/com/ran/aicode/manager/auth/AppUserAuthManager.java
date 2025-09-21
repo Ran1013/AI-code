@@ -5,7 +5,6 @@ import cn.hutool.core.util.StrUtil;
 import cn.hutool.json.JSONUtil;
 
 import com.ran.aicode.manager.auth.model.AppUserAuthConfig;
-import com.ran.aicode.manager.auth.model.AppUserPermissionConstant;
 import com.ran.aicode.manager.auth.model.AppUserRole;
 import com.ran.aicode.model.entity.App;
 import com.ran.aicode.model.entity.AppUser;
@@ -20,11 +19,8 @@ import org.springframework.stereotype.Component;
 
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
-
-import static com.ran.aicode.manager.auth.StpKit.TEAM;
 
 /**
  * 空间成员权限管理

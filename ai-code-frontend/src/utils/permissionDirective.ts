@@ -1,5 +1,5 @@
 import type { Directive, DirectiveBinding } from 'vue'
-import { hasPermission, canViewApp, canEditApp, canDeleteApp, canDownloadApp, canManageAppUsers, canGenCode, canDeployCode } from './permissionUtils'
+import { hasPermission, canViewApp, canEditApp, canDeleteApp, canDownloadApp, canManageAppUsers, canGenCode as canGenCodePermission, canDeployCode as canDeployCodePermission } from './permissionUtils'
 
 // 权限指令类型
 type PermissionDirectiveValue = {
@@ -144,17 +144,17 @@ export const canManageUsers: Directive = {
   }
 }
 
-export const canGenCode: Directive = {
+export const canGenCodeDirective: Directive = {
   mounted(el: HTMLElement, binding: DirectiveBinding) {
     const userPermissions: string[] = binding.value || []
-    if (!canGenCode(userPermissions)) {
+    if (!canGenCodePermission(userPermissions)) {
       el.style.display = 'none'
     }
   },
   
   updated(el: HTMLElement, binding: DirectiveBinding) {
     const userPermissions: string[] = binding.value || []
-    if (!canGenCode(userPermissions)) {
+    if (!canGenCodePermission(userPermissions)) {
       el.style.display = 'none'
     } else {
       el.style.display = ''
@@ -162,17 +162,17 @@ export const canGenCode: Directive = {
   }
 }
 
-export const canDeploy: Directive = {
+export const canDeployDirective: Directive = {
   mounted(el: HTMLElement, binding: DirectiveBinding) {
     const userPermissions: string[] = binding.value || []
-    if (!canDeployCode(userPermissions)) {
+    if (!canDeployCodePermission(userPermissions)) {
       el.style.display = 'none'
     }
   },
   
   updated(el: HTMLElement, binding: DirectiveBinding) {
     const userPermissions: string[] = binding.value || []
-    if (!canDeployCode(userPermissions)) {
+    if (!canDeployCodePermission(userPermissions)) {
       el.style.display = 'none'
     } else {
       el.style.display = ''
@@ -188,6 +188,6 @@ export function registerPermissionDirectives(app: any) {
   app.directive('can-delete', canDelete)
   app.directive('can-download', canDownload)
   app.directive('can-manage-users', canManageUsers)
-  app.directive('can-gen-code', canGenCode)
-  app.directive('can-deploy', canDeploy)
+  app.directive('can-gen-code', canGenCodeDirective)
+  app.directive('can-deploy', canDeployDirective)
 }

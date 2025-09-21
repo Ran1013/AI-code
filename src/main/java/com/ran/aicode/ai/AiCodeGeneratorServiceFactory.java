@@ -1,7 +1,5 @@
 package com.ran.aicode.ai;
 
-import com.ran.aicode.ai.guardrail.PromptSafetyInputGuardrail;
-import com.ran.aicode.ai.tools.FileWriteTool;
 import com.ran.aicode.ai.tools.ToolManager;
 import com.ran.aicode.exception.BusinessException;
 import com.ran.aicode.exception.ErrorCode;
@@ -56,14 +54,15 @@ public class AiCodeGeneratorServiceFactory {
         // 根据代码生成类型选择不同的模型配置
         return switch (codeGenType) {
             case VUE_PROJECT -> {
-                // 使用多例模式的 StreamingChatModel 解决并发问题
+                // 使用多例模式的 StreamingChatModel 解决并发问题（VUE 项目生成链路保留流式 + 工具能力）
                 StreamingChatModel reasoningStreamingChatModel = SpringContextUtil.getBean("reasoningStreamingChatModelPrototype", StreamingChatModel.class);
                 yield AiServices.builder(AiCodeGeneratorService.class)
+                        .chatModel(chatModel) // 添加非流式chatModel用于generateAppName
                         .streamingChatModel(reasoningStreamingChatModel)
                         .chatMemoryProvider(memoryId -> chatMemory)
-                        .tools(toolManager.getAllTools())
-                        .maxSequentialToolsInvocations(15)  // 最多连续调用 15 次工具
-//                        .inputGuardrails(new PromptSafetyInputGuardrail()) // 添加输入护轨
+                        .tools((Object[]) toolManager.getAllTools())
+                        .maxSequentialToolsInvocations(15)
+//                        .inputGuardrails(new PromptSafetyInputGuardrail())
                         .hallucinatedToolNameStrategy(toolExecutionRequest -> ToolExecutionResultMessage.from(
                                 toolExecutionRequest, "Error: there is no tool called " + toolExecutionRequest.name()
                         ))
@@ -73,10 +72,15 @@ public class AiCodeGeneratorServiceFactory {
                 // 使用多例模式的 StreamingChatModel 解决并发问题
                 StreamingChatModel openAiStreamingChatModel = SpringContextUtil.getBean("streamingChatModelPrototype", StreamingChatModel.class);
                 yield AiServices.builder(AiCodeGeneratorService.class)
-                        .chatModel(chatModel)
+                        .chatModel(chatModel) // 添加非流式chatModel用于generateAppName
                         .streamingChatModel(openAiStreamingChatModel)
-                        .chatMemory(chatMemory)
+                        .chatMemoryProvider(memoryId -> chatMemory)
+                        .tools((Object[]) toolManager.getAllTools())
+                        .maxSequentialToolsInvocations(15)
 //                        .inputGuardrails(new PromptSafetyInputGuardrail()) // 添加输入护轨
+                        .hallucinatedToolNameStrategy(toolExecutionRequest -> ToolExecutionResultMessage.from(
+                                toolExecutionRequest, "Error: there is no tool called " + toolExecutionRequest.name()
+                        ))
                         .build();
             }
             default -> throw new BusinessException(ErrorCode.SYSTEM_ERROR,

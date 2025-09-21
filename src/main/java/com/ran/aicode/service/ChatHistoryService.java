@@ -2,7 +2,6 @@ package com.ran.aicode.service;
 
 import com.ran.aicode.model.dto.ChatHistoryQueryRequest;
 import com.ran.aicode.model.entity.ChatHistory;
-import com.ran.aicode.model.entity.User;
 import com.ran.aicode.model.vo.ChatHistoryVO;
 import com.mybatisflex.core.paginate.Page;
 import com.mybatisflex.core.query.QueryWrapper;

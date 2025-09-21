@@ -5,7 +5,6 @@ import cn.hutool.core.util.StrUtil;
 
 import com.ran.aicode.model.entity.App;
 import com.ran.aicode.model.entity.User;
-import com.ran.aicode.model.enums.UserRoleEnum;
 import com.ran.aicode.service.AppService;
 import com.ran.aicode.service.AppUserService;
 import com.ran.aicode.service.UserService;
@@ -20,7 +19,6 @@ import org.springframework.web.socket.WebSocketHandler;
 import org.springframework.web.socket.server.HandshakeInterceptor;
 
 
-import java.util.List;
 import java.util.Map;
 
 /**

@@ -55,5 +55,20 @@ public class AppQueryRequest extends PageRequest implements Serializable {
      */
     private Integer isTeam;
 
+    /**
+     * 创建者关键字（支持用户ID / 账号 / 用户名）
+     */
+    private String creatorKeyword;
+
+    /**
+     * 排序字段
+     */
+    private String sortField;
+
+    /**
+     * 排序顺序
+     */
+    private String sortOrder;
+
     private static final long serialVersionUID = 1L;
 } 

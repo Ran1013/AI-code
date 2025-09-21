@@ -24,8 +24,6 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.annotation.Resource;
 import org.springframework.data.redis.core.RedisTemplate;
 
-import java.time.Duration;
-
 import org.springframework.stereotype.Service;
 import org.springframework.util.DigestUtils;
 
@@ -95,7 +93,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
     @Override
     public String getEncryptPassword(String userPassword) {
         // 盐值，混淆密码
-        final String SALT = "ran";
+        final String SALT = "Ran";
         return DigestUtils.md5DigestAsHex((SALT + userPassword).getBytes());
     }
 

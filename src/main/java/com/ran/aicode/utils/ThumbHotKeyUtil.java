@@ -1,20 +1,12 @@
 package com.ran.aicode.utils;
 
 import com.ran.aicode.constant.ThumbConstant;
-import com.ran.aicode.mapper.ThumbMapper;
-import com.ran.aicode.model.entity.Thumb;
 import com.jd.platform.hotkey.client.callback.JdHotKeyStore;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 
 import jakarta.annotation.Resource;
-
-import java.util.Collections;
-import java.util.List;
-import java.util.concurrent.CompletableFuture;
 
 import static com.ran.aicode.constant.ThumbConstant.RANK_KEY;
 
