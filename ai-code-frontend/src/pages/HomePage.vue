@@ -244,7 +244,7 @@ onMounted(() => {
           <p class="template-subtitle">选择一个模板，快速创建您的应用</p>
         </div>
         <div class="template-grid">
-          <div class="template-card" @click="setPrompt('创建一个简单的个人介绍页面，包含个人照片、基本信息、技能展示、联系方式，使用单个HTML文件，内联CSS和JS样式')">
+          <div class="template-card" @click="setPrompt('创建一个简单的个人介绍页面，包含个人照片、基本信息、技能展示、联系方式，使用单个HTML文件，内联CSS和JS样式。要求：代码简洁，功能完整，避免冗余代码。')">
             <div class="template-icon">📄</div>
             <div class="template-content">
               <h4 class="template-name">个人介绍页面</h4>
@@ -254,7 +254,7 @@ onMounted(() => {
             <div class="template-arrow">→</div>
           </div>
           
-          <div class="template-card" @click="setPrompt('设计一个多页面的企业展示网站，包含首页、关于我们、产品介绍、联系我们等页面，使用分离的HTML、CSS、JS文件结构')">
+          <div class="template-card" @click="setPrompt('设计一个多页面的企业展示网站，包含首页、关于我们、产品介绍、联系我们等页面，使用分离的HTML、CSS、JS文件结构。要求：代码精简，功能实用，避免过度设计。')">
             <div class="template-icon">🏢</div>
             <div class="template-content">
               <h4 class="template-name">企业展示网站</h4>
@@ -264,7 +264,7 @@ onMounted(() => {
             <div class="template-arrow">→</div>
           </div>
           
-          <div class="template-card" @click="setPrompt('构建一个现代化的Vue3电商应用，包含商品列表、购物车、用户登录、订单管理、商品搜索、分类筛选等复杂功能，使用Vue Router、状态管理、组件化开发')">
+          <div class="template-card" @click="setPrompt('构建一个现代化的Vue3电商应用，包含商品列表、购物车、用户登录、订单管理、商品搜索、分类筛选等复杂功能，使用Vue Router、状态管理、组件化开发。要求：代码简洁高效，功能完整，避免冗余组件和复杂逻辑，优先核心功能。')">
             <div class="template-icon">🛒</div>
             <div class="template-content">
               <h4 class="template-name">Vue电商应用</h4>
