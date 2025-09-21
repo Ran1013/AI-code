@@ -99,7 +99,7 @@ public class TokenServiceImpl implements TokenService {
         if (user != null) {
             // 如果数据库中没有这些字段，设置默认值
             if (user.getTotalTokens() == null) {
-                user.setTotalTokens(10000L); // 设置默认值
+                user.setTotalTokens(50000L); // 设置默认值
             }
             if (user.getUsedTokens() == null) {
                 user.setUsedTokens(0L); // 设置默认值
@@ -116,6 +116,7 @@ public class TokenServiceImpl implements TokenService {
         }
 
         User user = getUserTokenInfo(userId);
+        // 管理员和会员都不受token限制
         return user != null && ("admin".equals(user.getUserRole()) || "member".equals(user.getUserRole()));
     }
 

@@ -257,7 +257,7 @@ public class UserController {
             tokenInfo.setUserRole(loginUser.getUserRole());
             
             // 设置默认token值
-            tokenInfo.setTotalTokens(10000L);
+            tokenInfo.setTotalTokens(50000L);
             tokenInfo.setUsedTokens(0L);
             
             log.info("返回token信息: {}", tokenInfo);

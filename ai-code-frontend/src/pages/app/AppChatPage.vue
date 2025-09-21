@@ -116,7 +116,7 @@
                     回复 {{ message.userName }}
                     <!-- 所有用户都显示token消耗信息 -->
                     <span v-if="message.tokenInfo" class="token-consumption">
-                      本次消耗token: {{ message.tokenInfo.consumedTokens || 0 }} 剩余token: {{ message.tokenInfo.remainingTokens || 0 }}
+                      本次消耗: {{ message.tokenInfo.consumedTokens || 0 }} tokens | 剩余额度: {{ message.tokenInfo.remainingTokens || 0 }} tokens
                     </span>
                   </div>
                   <div v-if="message.status && (message.status === 1 || message.status === 2)" class="message-status">

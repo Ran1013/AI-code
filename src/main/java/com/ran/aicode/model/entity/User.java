@@ -113,7 +113,7 @@ public class User implements Serializable {
      */
     public Long getRemainingTokens() {
         if (totalTokens == null) {
-            totalTokens = 10000L; // 默认额度
+            totalTokens = 50000L; // 默认额度
         }
         if (usedTokens == null) {
             usedTokens = 0L;

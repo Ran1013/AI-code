@@ -34,7 +34,7 @@
               会员
             </a-tag>
             <a-tag v-else-if="tokenInfo" color="blue">
-              {{ tokenInfo.usedTokens || 0 }}/{{ tokenInfo.totalTokens || 10000 }}
+              使用量: {{ tokenInfo.usedTokens || 0 }}/{{ tokenInfo.totalTokens || '--' }}
             </a-tag>
             <a-tag v-else color="default">
               加载中...
@@ -102,29 +102,15 @@ const loadTokenInfo = async () => {
         console.log('GlobalHeader: token信息设置成功:', tokenInfo.value)
       } else {
         console.error('GlobalHeader: API返回错误:', res.data)
-        // 设置默认值作为fallback
-        tokenInfo.value = {
-          id: loginUserStore.loginUser.id,
-          userAccount: loginUserStore.loginUser.userAccount,
-          userName: loginUserStore.loginUser.userName,
-          userRole: loginUserStore.loginUser.userRole || 'user',
-          totalTokens: 10000,
-          usedTokens: 0
-        }
-        console.log('GlobalHeader: 使用fallback token信息:', tokenInfo.value)
+        // API失败时不设置token信息，让模板显示加载状态
+        tokenInfo.value = null
+        console.log('GlobalHeader: API失败，token信息设置为null')
       }
     } catch (error) {
       console.error('GlobalHeader: 获取token信息失败:', error)
-      // 设置默认值作为fallback
-      tokenInfo.value = {
-        id: loginUserStore.loginUser.id,
-        userAccount: loginUserStore.loginUser.userAccount,
-        userName: loginUserStore.loginUser.userName,
-        userRole: loginUserStore.loginUser.userRole || 'user',
-        totalTokens: 10000,
-        usedTokens: 0
-      }
-      console.log('GlobalHeader: 使用fallback token信息:', tokenInfo.value)
+      // 网络错误时不设置token信息，让模板显示加载状态
+      tokenInfo.value = null
+      console.log('GlobalHeader: 网络错误，token信息设置为null')
     }
   } else {
     console.log('GlobalHeader: 用户未登录，跳过token信息获取')
@@ -301,6 +287,16 @@ const doLogout = async () => {
   display: flex;
   align-items: center;
   gap: 12px;
+}
+
+/* 确保所有用户状态标签垂直对齐 */
+.user-status-container .ant-tag {
+  display: inline-flex;
+  align-items: center;
+  vertical-align: middle;
+  line-height: 1;
+  white-space: nowrap; /* 防止文本换行 */
+  min-height: 24px; /* 确保最小高度一致 */
 }
 
 .user-info {
