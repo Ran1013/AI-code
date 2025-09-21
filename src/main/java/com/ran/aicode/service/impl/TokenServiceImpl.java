@@ -97,13 +97,18 @@ public class TokenServiceImpl implements TokenService {
         
         // 确保返回的User对象包含所有需要的token信息字段
         if (user != null) {
-            // 如果数据库中没有这些字段，设置默认值
+            // 如果数据库中没有这些字段，设置默认值（这种情况应该很少见）
             if (user.getTotalTokens() == null) {
+                log.warn("用户 {} 的totalTokens字段为null，设置默认值50000", userId);
                 user.setTotalTokens(50000L); // 设置默认值
             }
             if (user.getUsedTokens() == null) {
+                log.warn("用户 {} 的usedTokens字段为null，设置默认值0", userId);
                 user.setUsedTokens(0L); // 设置默认值
             }
+            
+            log.debug("用户 {} token信息: 总token={}, 已使用={}, 剩余={}", 
+                userId, user.getTotalTokens(), user.getUsedTokens(), user.getRemainingTokens());
         }
         
         return user;

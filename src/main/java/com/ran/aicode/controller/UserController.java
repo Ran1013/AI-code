@@ -249,18 +249,20 @@ public class UserController {
             
             log.info("获取用户token信息，用户ID: {}", loginUser.getId());
             
-            // 直接创建token信息，避免数据库查询问题
-            User tokenInfo = new User();
-            tokenInfo.setId(loginUser.getId());
+            // 从数据库获取完整的用户token信息
+            User tokenInfo = tokenService.getUserTokenInfo(loginUser.getId());
+            if (tokenInfo == null) {
+                throw new BusinessException(ErrorCode.NOT_FOUND_ERROR, "用户token信息不存在");
+            }
+            
+            // 确保返回完整的用户信息
             tokenInfo.setUserAccount(loginUser.getUserAccount());
             tokenInfo.setUserName(loginUser.getUserName());
             tokenInfo.setUserRole(loginUser.getUserRole());
             
-            // 设置默认token值
-            tokenInfo.setTotalTokens(50000L);
-            tokenInfo.setUsedTokens(0L);
-            
-            log.info("返回token信息: {}", tokenInfo);
+            log.info("返回token信息: 用户ID={}, 总token={}, 已使用={}, 剩余={}", 
+                tokenInfo.getId(), tokenInfo.getTotalTokens(), 
+                tokenInfo.getUsedTokens(), tokenInfo.getRemainingTokens());
             
             return ResultUtils.success(tokenInfo);
         } catch (Exception e) {

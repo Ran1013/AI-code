@@ -34,7 +34,7 @@
               会员
             </a-tag>
             <a-tag v-else-if="tokenInfo" color="blue">
-              使用量: {{ tokenInfo.usedTokens || 0 }}/{{ tokenInfo.totalTokens || '--' }}
+              使用量: {{ tokenInfo.usedTokens }}/{{ tokenInfo.totalTokens }}
             </a-tag>
             <a-tag v-else color="default">
               加载中...
