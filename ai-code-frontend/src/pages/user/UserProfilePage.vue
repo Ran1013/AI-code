@@ -191,6 +191,8 @@ const formatUserRole = (role?: string) => {
   switch (role) {
     case 'admin':
       return '管理员'
+    case 'member':
+      return '会员'
     case 'user':
       return '普通用户'
     default:
@@ -203,6 +205,8 @@ const getRoleColor = (role?: string) => {
   switch (role) {
     case 'admin':
       return 'red'
+    case 'member':
+      return 'orange'
     case 'user':
       return 'blue'
     default:

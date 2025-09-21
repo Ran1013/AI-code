@@ -1,6 +1,5 @@
 package com.ran.aicode.service.impl;
 
-import com.mybatisflex.core.query.QueryWrapper;
 import com.ran.aicode.model.entity.User;
 import com.ran.aicode.service.TokenService;
 import com.ran.aicode.service.UserService;
