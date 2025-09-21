@@ -25,25 +25,24 @@
       <!-- 右侧：用户操作区域 -->
       <a-col flex="200px" style="text-align: right;">
         <div class="user-login-status">
-          <div v-if="loginUserStore.loginUser.id">
+          <div v-if="loginUserStore.loginUser.id" class="user-status-container">
+            <!-- 用户状态徽章（独立显示，不参与下拉菜单） -->
+            <a-tag v-if="tokenInfo && tokenInfo.userRole === 'admin'" color="green">
+              管理员
+            </a-tag>
+            <a-tag v-else-if="tokenInfo && tokenInfo.userRole === 'member'" color="orange">
+              会员
+            </a-tag>
+            <a-tag v-else-if="tokenInfo" color="blue">
+              {{ tokenInfo.usedTokens || 0 }}/{{ tokenInfo.totalTokens || 10000 }}
+            </a-tag>
+            <a-tag v-else color="default">
+              加载中...
+            </a-tag>
+            
+            <!-- 用户头像和用户名（可点击下拉菜单） -->
             <a-dropdown>
               <a-space class="user-info">
-                <!-- 用户状态徽章（在用户名前） -->
-                <span v-if="tokenInfo && tokenInfo.userRole === 'admin'" class="admin-badge">
-                  <CrownOutlined />
-                  管理员
-                </span>
-                <span v-else-if="tokenInfo && tokenInfo.userRole === 'member'" class="member-badge">
-                  <StarOutlined />
-                  VIP会员
-                </span>
-                <span v-else-if="tokenInfo" class="token-info">
-                  {{ tokenInfo.usedTokens || 0 }}/{{ tokenInfo.totalTokens || 10000 }}
-                </span>
-                <span v-else class="loading-info">
-                  加载中...
-                </span>
-                <!-- 用户头像和用户名 -->
                 <a-avatar :src="loginUserStore.loginUser.userAvatar" class="user-avatar" />
                 <span class="username">{{ loginUserStore.loginUser.userName ?? '无名' }}</span>
               </a-space>
@@ -76,7 +75,7 @@ import { useRouter } from 'vue-router'
 import { type MenuProps, message } from 'ant-design-vue'
 import { useLoginUserStore } from '../stores/loginUser'
 import { userLogout, getUserTokenInfo } from '../api/userController'
-import { LogoutOutlined, HomeOutlined, UserOutlined, StarOutlined, CrownOutlined } from '@ant-design/icons-vue'
+import { LogoutOutlined, HomeOutlined, UserOutlined, StarOutlined } from '@ant-design/icons-vue'
 
 const loginUserStore = useLoginUserStore()
 const router = useRouter()
@@ -235,10 +234,12 @@ const doLogout = async () => {
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
   display: flex;
   align-items: center;
+  width: 100%;
 }
 
 .header-content {
   width: 100%;
+  height: 100%;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -296,6 +297,12 @@ const doLogout = async () => {
   align-items: center;
 }
 
+.user-status-container {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
 .user-info {
   cursor: pointer;
   padding: 8px 12px;
@@ -333,57 +340,6 @@ const doLogout = async () => {
   align-items: center;
 }
 
-.admin-badge {
-  font-size: 12px;
-  color: #fff;
-  background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%);
-  padding: 2px 8px;
-  border-radius: 12px;
-  font-weight: 500;
-  box-shadow: 0 1px 4px rgba(238, 90, 36, 0.3);
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  white-space: nowrap;
-}
-
-.member-badge {
-  font-size: 12px;
-  color: #fff;
-  background: linear-gradient(135deg, #ffd700 0%, #ff8c00 100%);
-  padding: 2px 8px;
-  border-radius: 12px;
-  font-weight: 500;
-  box-shadow: 0 1px 4px rgba(255, 140, 0, 0.3);
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  white-space: nowrap;
-}
-
-.token-info {
-  font-size: 12px;
-  color: #fff;
-  background: linear-gradient(135deg, #1890ff 0%, #096dd9 100%);
-  padding: 2px 8px;
-  border-radius: 12px;
-  font-weight: 500;
-  box-shadow: 0 1px 4px rgba(24, 144, 255, 0.3);
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  white-space: nowrap;
-}
-
-.loading-info {
-  font-size: 12px;
-  color: #8c8c8c;
-  font-style: italic;
-  padding: 2px 8px;
-  background: rgba(140, 140, 140, 0.1);
-  border-radius: 12px;
-  white-space: nowrap;
-}
 
 .login-btn {
   border-radius: 8px;
