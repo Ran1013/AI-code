@@ -1290,9 +1290,36 @@ const stopGeneration = async () => {
 // 错误处理函数
 const handleError = (error: unknown, aiMessageIndex: number) => {
   console.error('生成代码失败：', error)
-  messages.value[aiMessageIndex].content = '抱歉，生成过程中出现了错误，请重试。'
+  
+  // 检查是否是token不足导致的错误
+  let errorMessage = '抱歉，生成过程中出现了错误，请重试。'
+  let errorTitle = '生成失败，请重试'
+  
+  // 如果是Error对象且包含特定信息，尝试解析错误原因
+  if (error instanceof Error) {
+    const errorText = error.message || error.toString()
+    
+    // 检查是否包含token相关错误信息
+    if (errorText.includes('Token') || errorText.includes('token') || 
+        errorText.includes('额度') || errorText.includes('充值')) {
+      errorMessage = '❌ Token额度不足，请联系管理员充值'
+      errorTitle = 'Token额度不足'
+    }
+    // 检查是否是网络连接错误
+    else if (errorText.includes('Failed to fetch') || errorText.includes('Network')) {
+      errorMessage = '❌ 网络连接失败，请检查网络后重试'
+      errorTitle = '网络连接失败'
+    }
+    // 检查是否是服务器错误
+    else if (errorText.includes('500') || errorText.includes('Internal Server Error')) {
+      errorMessage = '❌ 服务器内部错误，请稍后重试'
+      errorTitle = '服务器错误'
+    }
+  }
+  
+  messages.value[aiMessageIndex].content = errorMessage
   messages.value[aiMessageIndex].loading = false
-  message.error('生成失败，请重试')
+  message.error(errorTitle)
   isGenerating.value = false
   
   // 清理 EventSource
