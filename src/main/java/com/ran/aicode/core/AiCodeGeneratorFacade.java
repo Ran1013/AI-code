@@ -118,6 +118,23 @@ public class AiCodeGeneratorFacade {
     }
 
     /**
+     * 统一入口（含预占上下文）：仅 Vue 模式使用，用于根据实际消耗多退少补。
+     */
+    public Flux<String> generateAndSaveCodeStreamWithReservation(String userMessage, CodeGenTypeEnum codeGenTypeEnum,
+                                                                 Long appId, Long userId,
+                                                                 String reservationId, long estimatedTokens) {
+        if (codeGenTypeEnum != CodeGenTypeEnum.VUE_PROJECT) {
+            return generateAndSaveCodeStream(userMessage, codeGenTypeEnum, appId, userId);
+        }
+        if (generationTaskManager.hasActiveTask(appId)) {
+            throw new BusinessException(ErrorCode.SYSTEM_ERROR, "该应用已有正在进行的生成任务，请等待完成或取消后再试");
+        }
+        AiCodeGeneratorService aiCodeGeneratorService = aiCodeGeneratorServiceFactory.getAiCodeGeneratorService(appId, codeGenTypeEnum);
+        TokenStream tokenStream = aiCodeGeneratorService.generateVueProjectCodeStream(appId, userMessage);
+        return processTokenStreamWithReservation(tokenStream, appId, userId, codeGenTypeEnum, reservationId, estimatedTokens);
+    }
+
+    /**
      * 取消正在进行的代码生成
      *
      * @param appId 应用ID
@@ -308,6 +325,89 @@ public class AiCodeGeneratorFacade {
                         sink.complete();
                     })
                     .onError((Throwable error) -> {
+                        error.printStackTrace();
+                        generationTaskManager.completeTask(appId);
+                        sink.error(error);
+                    })
+                    .start();
+        });
+    }
+
+    /**
+     * Vue 预占版本：按实际使用对预占进行多退少补，不再重复调用通用的 consumeTokens。
+     */
+    private Flux<String> processTokenStreamWithReservation(TokenStream tokenStream, Long appId, Long userId,
+                                                           CodeGenTypeEnum codeGenType, String reservationId,
+                                                           long estimatedTokens) {
+        StringBuilder partialContentBuilder = new StringBuilder();
+        return Flux.create((FluxSink<String> sink) -> {
+            Disposable disposable = Flux.never().subscribe();
+            generationTaskManager.registerTask(appId, codeGenType.getValue(), disposable, sink, userId, partialContentBuilder);
+
+            tokenStream.onPartialResponse((String partialResponse) -> {
+                        AiResponseMessage aiResponseMessage = new AiResponseMessage(partialResponse);
+                        partialContentBuilder.append(partialResponse);
+                        sink.next(JSONUtil.toJsonStr(aiResponseMessage));
+                    })
+                    .onPartialToolExecutionRequest((index, toolExecutionRequest) -> {
+                        ToolRequestMessage toolRequestMessage = new ToolRequestMessage(toolExecutionRequest);
+                        sink.next(JSONUtil.toJsonStr(toolRequestMessage));
+                    })
+                    .onToolExecuted((ToolExecution toolExecution) -> {
+                        log.info("工具执行完成: toolName={}, result={}",
+                                toolExecution.request().name(),
+                                cn.hutool.core.util.StrUtil.maxLength(toolExecution.result(), 100));
+                        ToolExecutedMessage toolExecutedMessage = new ToolExecutedMessage(toolExecution);
+                        sink.next(JSONUtil.toJsonStr(toolExecutedMessage));
+                    })
+                    .onCompleteResponse((ChatResponse response) -> {
+                        try {
+                            dev.langchain4j.model.output.TokenUsage tokenUsage = response.metadata().tokenUsage();
+                            if (tokenUsage != null) {
+                                long inputTokens = tokenUsage.inputTokenCount() != null ? tokenUsage.inputTokenCount() : 0L;
+                                long outputTokens = tokenUsage.outputTokenCount() != null ? tokenUsage.outputTokenCount() : 0L;
+                                long actual = inputTokens + outputTokens;
+                                if (reservationId != null && estimatedTokens > 0) {
+                                    if (actual > estimatedTokens) {
+                                        long delta = actual - estimatedTokens;
+                                        // 预占不够，补扣差额
+                                        tokenService.consumeTokens(userId, delta);
+                                    } else if (actual < estimatedTokens) {
+                                        long refund = estimatedTokens - actual;
+                                        tokenService.refund(userId, refund, reservationId);
+                                    }
+                                } else {
+                                    // 无预占，走通用消费
+                                    if (actual > 0) {
+                                        tokenService.consumeTokens(userId, actual);
+                                    }
+                                }
+                            }
+                        } catch (Exception e) {
+                            log.error("统计用户token消耗(预占)失败: userId={}, error={}", userId, e.getMessage(), e);
+                        }
+
+                        // 后处理，与通用一致
+                        try {
+                            if (codeGenType == CodeGenTypeEnum.VUE_PROJECT) {
+                                String projectPath = AppConstant.CODE_OUTPUT_ROOT_DIR + "/vue_project_" + appId;
+                                vueProjectBuilder.buildProjectAsync(projectPath);
+                                log.info("Vue项目构建已启动（异步）: {}", projectPath);
+                            }
+                        } catch (Exception e) {
+                            log.error("代码保存失败: {}", e.getMessage());
+                        }
+
+                        generationTaskManager.completeTask(appId);
+                        sink.complete();
+                    })
+                    .onError((Throwable error) -> {
+                        // 失败则退还全部预占
+                        try {
+                            if (reservationId != null && estimatedTokens > 0) {
+                                tokenService.refund(userId, estimatedTokens, reservationId);
+                            }
+                        } catch (Exception ignore) {}
                         error.printStackTrace();
                         generationTaskManager.completeTask(appId);
                         sink.error(error);

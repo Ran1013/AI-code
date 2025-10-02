@@ -44,6 +44,32 @@ public interface TokenService {
     boolean isAdminUser(Long userId);
 
     /**
+     * 是否为会员用户
+     */
+    boolean isMemberUser(Long userId);
+
+    /**
+     * 获取剩余 token 数
+     */
+    long getRemainingTokens(Long userId);
+
+    /**
+     * 预占 token（开始前锁定额度）。若成功，会立即从已用额度中预扣。
+     * 完成后需调用 adjust/refund 进行结算。
+     */
+    boolean preConsume(Long userId, long estimatedTokens, String reservationId);
+
+    /**
+     * 退款（用于实际消耗小于预估时退回差额，或失败时退回全部）。
+     */
+    void refund(Long userId, long tokens, String reservationId);
+
+    /**
+     * 按实际消耗结算（多退少补）。
+     */
+    void adjustToActual(Long userId, long actualTokens, String reservationId);
+
+    /**
      * 重置用户token（管理员功能）
      * 
      * @param userId 用户ID

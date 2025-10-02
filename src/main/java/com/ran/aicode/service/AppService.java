@@ -78,7 +78,7 @@ public interface AppService extends IService<App> {
      * @param images    可选的图片 URL 列表（用于多模态场景）
      * @return 代码片段字符串的响应流（可对接 SSE/WebFlux 实时推送）
      */
-    Flux<String> chatToGenCode(Long appId, String message, User loginUser,List<String> images);
+    Flux<String> chatToGenCode(Long appId, String message, User loginUser,List<String> images, boolean force);
 
 
     /**

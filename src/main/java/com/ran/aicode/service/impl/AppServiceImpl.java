@@ -86,7 +86,7 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
     private TokenService tokenService;
 
     @Override
-    public Flux<String> chatToGenCode(Long appId, String message, User loginUser, List<String> images) {
+    public Flux<String> chatToGenCode(Long appId, String message, User loginUser, List<String> images, boolean force) {
         // 1. 参数校验
         ThrowUtils.throwIf(appId == null || appId <= 0, ErrorCode.PARAMS_ERROR, "应用 ID 不能为空");
         ThrowUtils.throwIf(StrUtil.isBlank(message), ErrorCode.PARAMS_ERROR, "用户消息不能为空");
@@ -100,12 +100,13 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
             throw new BusinessException(ErrorCode.NO_AUTH_ERROR, "无权限访问该应用");
         }
         
-        // 4. 检查用户token额度（管理员和会员不受限制）
+        // 4. 软拦截：管理员/会员跳过，普通用户进行余额估算校验
         if (!tokenService.isAdminUser(loginUser.getId())) {
-            // 预估需要消耗的token数量（可以根据消息长度估算）
-            Long estimatedTokens = Math.max(100L, message.length() / 2); // 简单估算
-            if (!tokenService.hasEnoughTokens(loginUser.getId(), estimatedTokens)) {
-                throw new BusinessException(ErrorCode.NO_AUTH_ERROR, "Token额度不足，请联系管理员充值");
+            long estimatedTokens = estimateRequiredTokens(message, app.getCodeGenType());
+            long remaining = tokenService.getRemainingTokens(loginUser.getId());
+            if (remaining < estimatedTokens && !force) {
+                String msg = String.format("token 不足，需 ≥%d，当前剩余 %d，请联系管理员。", estimatedTokens, remaining);
+                throw new BusinessException(ErrorCode.TOKEN_INSUFFICIENT, msg);
             }
         }
         // 5. 获取应用的代码生成类型
@@ -125,15 +126,43 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         // 8. 调用 AI 生成代码（流式）
         Flux<String> codeStream;
         if (loginUser.getUserRole().equals(UserRoleEnum.MEMBER.getValue())) {
-            //会员
+            // 会员：走工作流（无限制）
             codeStream = new CodeGenConcurrentWorkflow().executeWorkflowWithFlux(fullMessage, appId, loginUser.getId());
+        } else if (codeGenTypeEnum == CodeGenTypeEnum.VUE_PROJECT) {
+            // 普通用户 + Vue：预占
+            long estimatedTokens = estimateRequiredTokens(message, app.getCodeGenType());
+            String reservationId = "vue-" + appId + "-" + loginUser.getId() + "-" + System.currentTimeMillis();
+            boolean reserved = tokenService.preConsume(loginUser.getId(), estimatedTokens, reservationId);
+            if (!reserved && !force) {
+                long remaining = tokenService.getRemainingTokens(loginUser.getId());
+                String msg = String.format("token 不足，需 ≥%d，当前剩余 %d，请联系管理员。", estimatedTokens, remaining);
+                throw new BusinessException(ErrorCode.TOKEN_INSUFFICIENT, msg);
+            }
+            codeStream = aiCodeGeneratorFacade.generateAndSaveCodeStreamWithReservation(fullMessage, codeGenTypeEnum, appId, loginUser.getId(), reservationId, estimatedTokens);
         } else {
-            //普通
+            // 普通用户 + 非 Vue：直接走统一入口（完成后按实际消费）
             codeStream = aiCodeGeneratorFacade.generateAndSaveCodeStream(fullMessage, codeGenTypeEnum, appId, loginUser.getId());
         }
         // 7. 收集 AI 响应的内容，并且在完成后保存记录到对话历史
         return streamHandlerExecutor.doExecute(codeStream, chatHistoryService, appId, loginUser, codeGenTypeEnum);
 
+    }
+
+    /**
+     * 基于配置估算本次生成所需 token（软拦截用）。
+     */
+    private long estimateRequiredTokens(String message, String codeGenType) {
+        // 默认值兜底（与 application-prod.yml 一致）
+        double base = 1200, multiplier = 1.0, bufferRate = 0.15;
+        if (CodeGenTypeEnum.MULTI_FILE.getValue().equals(codeGenType)) {
+            base = 6000; multiplier = 2.0; bufferRate = 0.15;
+        } else if (CodeGenTypeEnum.VUE_PROJECT.getValue().equals(codeGenType)) {
+            base = 15000; multiplier = 3.5; bufferRate = 0.2;
+        }
+        int promptLen = message != null ? message.length() : 0;
+        double estimate = base + (promptLen / 3.0) * multiplier;
+        estimate = Math.ceil(estimate * (1.0 + bufferRate));
+        return Math.max(100, (long) estimate);
     }
 
     /**

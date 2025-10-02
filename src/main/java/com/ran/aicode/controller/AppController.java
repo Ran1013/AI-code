@@ -80,6 +80,7 @@ public class AppController {
     public Flux<ServerSentEvent<String>> chatToGenCode(@RequestParam Long appId,
                                                        @RequestParam String message,
                                                        @RequestParam(required = false) List<String> image,
+                                                       @RequestParam(required = false, defaultValue = "false") boolean force,
                                                        HttpServletRequest request) {
         // 参数校验
         ThrowUtils.throwIf(appId == null || appId <= 0, ErrorCode.PARAMS_ERROR, "应用ID无效");
@@ -87,7 +88,7 @@ public class AppController {
         // 获取当前登录用户
         User loginUser = userService.getLoginUser(request);
         //如果是会员调用工作流生成代码
-        Flux<String> contentFlux = appService.chatToGenCode(appId, message, loginUser, image);
+        Flux<String> contentFlux = appService.chatToGenCode(appId, message, loginUser, image, force);
         // 转换为 ServerSentEvent 格式
         return contentFlux
                 .map(chunk -> {
