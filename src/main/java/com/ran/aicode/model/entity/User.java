@@ -95,4 +95,26 @@ public class User implements Serializable {
     @Column(value = "isDelete", isLogicDelete = true)
     private Integer isDelete;
 
+    /**
+     * Token总额度
+     */
+    @Column("totalTokens")
+    private Long totalTokens;
+
+    /**
+     * 已使用的Token数量
+     */
+    @Column("usedTokens")
+    private Long usedTokens;
+
+    /**
+     * 剩余额度（非持久化，基于总额与已用计算）
+     */
+    public Long getRemainingTokens() {
+        Long total = this.totalTokens != null ? this.totalTokens : 0L;
+        Long used = this.usedTokens != null ? this.usedTokens : 0L;
+        long remaining = total - used;
+        return Math.max(remaining, 0L);
+    }
+
 }

@@ -6,10 +6,11 @@ import { likeApp, unlikeApp, appThumbList } from '../api/thumbController'
 import { getDeployUrl } from '../config/env'
 import AppCard from '../components/AppCard.vue'
 import { message } from 'ant-design-vue'
+import { toAppIdString } from '@/utils/appIdUtils'
 
 // 防抖函数
 const debounce = (func: Function, delay: number) => {
-  let timeoutId: NodeJS.Timeout
+  let timeoutId: ReturnType<typeof setTimeout>
   return (...args: any[]) => {
     clearTimeout(timeoutId)
     timeoutId = setTimeout(() => func.apply(null, args), delay)
@@ -86,10 +87,30 @@ const viewTeamManagement = (appId: string | number | undefined) => {
   }
 }
 
-// 查看热门应用详情
-const viewHotApp = (appId: number | undefined) => {
-  if (appId) {
-    router.push(`/app/chat/${appId}?view=1`)
+// 兼容不同字段来源，安全提取榜单项的 AppId
+const getHotAppId = (app: Partial<API.AppThumbVO> & { id?: number | string }): string | undefined => {
+  // 优先使用 appId，其次兼容 id 字段
+  const rawId = app?.appId ?? app?.id
+  return toAppIdString(rawId)
+}
+
+// 查看热门应用详情（将长整型ID安全转换为字符串，避免精度问题）
+const viewHotApp = (appId: number | string | undefined) => {
+  const appIdStr = toAppIdString(appId as any)
+  if (appIdStr) {
+    router.push(`/app/chat/${appIdStr}?view=1`)
+  } else {
+    console.warn('无效的appId：', appId)
+  }
+}
+
+// 点击热门应用（从对象中提取ID并跳转）
+const onClickHotApp = (app: any) => {
+  const appIdStr = getHotAppId(app)
+  if (appIdStr) {
+    router.push(`/app/chat/${appIdStr}?view=1`)
+  } else {
+    console.warn('热门应用缺少ID字段：', app)
   }
 }
 
@@ -190,9 +211,9 @@ onMounted(() => {
             <div class="hot-topics-list">
               <div
                 v-for="(app, index) in hotApps"
-                :key="app.appId"
+                :key="app.appId ?? index"
                 class="topic-item"
-                @click="viewHotApp(app.appId)"
+                @click="onClickHotApp(app)"
               >
                 <span class="topic-rank">{{ index + 1 }}</span>
                 <span class="topic-title">{{ app.appName || '未命名应用' }}</span>
