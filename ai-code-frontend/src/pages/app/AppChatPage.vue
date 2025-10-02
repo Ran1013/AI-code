@@ -427,6 +427,11 @@ const updateTokenInfoForMessage = async (messageIndex: number) => {
         }
         
         console.log(`用户 ${tokenData.userRole} 的token信息:`, message.tokenInfo)
+        
+        // 刷新全局token信息，更新头部显示
+        const { useTokenInfoStore } = await import('@/stores/tokenInfo')
+        const tokenInfoStore = useTokenInfoStore()
+        await tokenInfoStore.refreshTokenInfo()
       }
     }
   } catch (error) {

@@ -44,6 +44,10 @@ public class VueProjectBuilder {
             log.error("项目目录不存在：{}", projectPath);
             return false;
         }
+        
+        // 清理旧的构建文件，确保第二次使用时的构建是干净的
+        cleanupOldBuildFiles(projectDir);
+        
         // 检查是否有 package.json 文件，如果没有则自动创建
         File packageJsonFile = new File(projectDir, "package.json");
         if (!packageJsonFile.exists()) {
@@ -192,6 +196,61 @@ public class VueProjectBuilder {
         } catch (Exception e) {
             log.error("执行命令失败: {}, 错误信息: {}", command, e.getMessage());
             return false;
+        }
+    }
+
+    /**
+     * 清理旧的构建文件
+     *
+     * @param projectDir 项目目录
+     */
+    private void cleanupOldBuildFiles(File projectDir) {
+        try {
+            // 删除 dist 目录（构建输出目录）
+            File distDir = new File(projectDir, "dist");
+            if (distDir.exists()) {
+                deleteDirectory(distDir);
+                log.info("已清理旧的 dist 目录: {}", distDir.getAbsolutePath());
+            }
+            
+            // 删除 node_modules 目录（依赖目录）
+            File nodeModulesDir = new File(projectDir, "node_modules");
+            if (nodeModulesDir.exists()) {
+                deleteDirectory(nodeModulesDir);
+                log.info("已清理旧的 node_modules 目录: {}", nodeModulesDir.getAbsolutePath());
+            }
+            
+            // 删除 package-lock.json 文件（锁定文件）
+            File packageLockFile = new File(projectDir, "package-lock.json");
+            if (packageLockFile.exists()) {
+                packageLockFile.delete();
+                log.info("已清理旧的 package-lock.json 文件: {}", packageLockFile.getAbsolutePath());
+            }
+            
+            log.info("Vue项目旧构建文件清理完成: {}", projectDir.getAbsolutePath());
+        } catch (Exception e) {
+            log.error("清理旧构建文件失败: {}", e.getMessage(), e);
+        }
+    }
+
+    /**
+     * 递归删除目录及其所有内容
+     *
+     * @param directory 要删除的目录
+     */
+    private void deleteDirectory(File directory) {
+        if (directory.exists()) {
+            File[] files = directory.listFiles();
+            if (files != null) {
+                for (File file : files) {
+                    if (file.isDirectory()) {
+                        deleteDirectory(file);
+                    } else {
+                        file.delete();
+                    }
+                }
+            }
+            directory.delete();
         }
     }
 

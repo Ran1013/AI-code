@@ -99,16 +99,16 @@ public class AiCodeGeneratorFacade {
         AiCodeGeneratorService aiCodeGeneratorService = aiCodeGeneratorServiceFactory.getAiCodeGeneratorService(appId, codeGenTypeEnum);
         return switch (codeGenTypeEnum) {
             case HTML -> {
-                Flux<String> codeStream = aiCodeGeneratorService.generateHtmlCodeStream(userMessage);
-                yield processCodeStream(codeStream, CodeGenTypeEnum.HTML, appId, userId);
+                TokenStream tokenStream = aiCodeGeneratorService.generateHtmlCodeStream(appId, userMessage);
+                yield processTokenStreamForSimpleText(tokenStream, appId, userId, CodeGenTypeEnum.HTML);
             }
             case MULTI_FILE -> {
-                Flux<String> codeStream = aiCodeGeneratorService.generateMultiFileCodeStream(userMessage);
-                yield processCodeStream(codeStream, CodeGenTypeEnum.MULTI_FILE, appId, userId);
+                TokenStream tokenStream = aiCodeGeneratorService.generateMultiFileCodeStream(appId, userMessage);
+                yield processTokenStreamForSimpleText(tokenStream, appId, userId, CodeGenTypeEnum.MULTI_FILE);
             }
             case VUE_PROJECT -> {
                 TokenStream tokenStream = aiCodeGeneratorService.generateVueProjectCodeStream(appId, userMessage);
-                yield processTokenStream(tokenStream, appId, userId);
+                yield processTokenStream(tokenStream, appId, userId, CodeGenTypeEnum.VUE_PROJECT);
             }
             default -> {
                 String errorMessage = "不支持的生成类型：" + codeGenTypeEnum.getValue();
@@ -138,58 +138,86 @@ public class AiCodeGeneratorFacade {
         return generationTaskManager;
     }
 
+
     /**
-     * 通用流式代码处理方法
+     * 将 TokenStream 转换为纯文本流（用于HTML和多文件模式），过滤工具调用信息
      *
-     * @param codeStream  代码流
-     * @param codeGenType 代码生成类型
-     * @param appId 应用 ID
+     * @param tokenStream TokenStream 对象
+     * @param appId 应用ID
      * @param userId 用户ID
-     * @return 流式响应
+     * @param codeGenType 代码生成类型
+     * @return Flux<String> 纯文本流式响应
      */
-    private Flux<String> processCodeStream(Flux<String> codeStream, CodeGenTypeEnum codeGenType, Long appId, Long userId) {
-        // 字符串拼接器，用于当流式返回所有的代码之后，再保存代码
-        StringBuilder codeBuilder = new StringBuilder();
+    private Flux<String> processTokenStreamForSimpleText(TokenStream tokenStream, Long appId, Long userId, CodeGenTypeEnum codeGenType) {
         // 部分内容收集器，用于取消时保存已生成的内容
         StringBuilder partialContentBuilder = new StringBuilder();
         
         return Flux.create((FluxSink<String> sink) -> {
             // 注册任务到管理器
-            Disposable disposable = codeStream
-                    .doOnNext(chunk -> {
-                        // 实时收集代码片段
-                        codeBuilder.append(chunk);
-                        // 同时收集部分内容用于取消时保存
-                        partialContentBuilder.append(chunk);
-                        // 发送到客户端
-                        sink.next(chunk);
+            Disposable disposable = Flux.never().subscribe(); // 占位符，实际取消逻辑在TokenStream中
+            
+            generationTaskManager.registerTask(appId, codeGenType.getValue(), disposable, sink, userId, partialContentBuilder);
+            
+            tokenStream.onPartialResponse((String partialResponse) -> {
+                        // 收集部分内容
+                        partialContentBuilder.append(partialResponse);
+                        // 直接返回文本内容，不包装成JSON
+                        sink.next(partialResponse);
                     })
-                    .doOnComplete(() -> {
-                        // 流式返回完成后，保存代码
+                    .onPartialToolExecutionRequest((index, toolExecutionRequest) -> {
+                        // 对于HTML和多文件模式，忽略工具调用请求，不向用户显示
+                        log.debug("忽略工具调用请求: {}", toolExecutionRequest.name());
+                    })
+                    .onToolExecuted((ToolExecution toolExecution) -> {
+                        // 对于HTML和多文件模式，忽略工具执行结果，不向用户显示
+                        log.debug("忽略工具执行结果: {}", toolExecution.request().name());
+                    })
+                    .onCompleteResponse((ChatResponse response) -> {
+                        // 统计并更新用户token消耗
                         try {
-                            String completeCode = codeBuilder.toString();
-                            // 使用执行器解析代码
-                            Object parsedResult = CodeParserExecutor.executeParser(completeCode, codeGenType);
-                            // 使用执行器保存代码
-                            File saveDir = CodeFileSaverExecutor.executeSaver(parsedResult, codeGenType, appId);
-                            log.info("保存成功，目录为：{}", saveDir.getAbsolutePath());
+                            dev.langchain4j.model.output.TokenUsage tokenUsage = response.metadata().tokenUsage();
+                            if (tokenUsage != null) {
+                                // 计算总token消耗（input + output）
+                                Long inputTokens = tokenUsage.inputTokenCount() != null ? tokenUsage.inputTokenCount() : 0L;
+                                Long outputTokens = tokenUsage.outputTokenCount() != null ? tokenUsage.outputTokenCount() : 0L;
+                                Long consumedTokens = inputTokens + outputTokens;
+                                
+                                if (consumedTokens > 0) {
+                                    boolean success = tokenService.consumeTokens(userId, consumedTokens);
+                                    if (success) {
+                                        log.info("用户 {} 消耗token成功，消耗: {}", userId, consumedTokens);
+                                    } else {
+                                        log.warn("用户 {} 消耗token失败，消耗: {}", userId, consumedTokens);
+                                    }
+                                }
+                            }
                         } catch (Exception e) {
-                            log.error("保存失败: {}", e.getMessage());
-                        } finally {
-                            // 完成任务
-                            generationTaskManager.completeTask(appId);
-                            sink.complete();
+                            log.error("统计用户token消耗失败: userId={}, error={}", userId, e.getMessage(), e);
                         }
+
+                        // 保存代码
+                        try {
+                            String completeCode = partialContentBuilder.toString();
+                            if (completeCode != null && !completeCode.trim().isEmpty()) {
+                                // 使用执行器解析代码
+                                Object parsedResult = CodeParserExecutor.executeParser(completeCode, codeGenType);
+                                // 使用执行器保存代码
+                                File saveDir = CodeFileSaverExecutor.executeSaver(parsedResult, codeGenType, appId);
+                                log.info("保存成功，目录为：{}", saveDir.getAbsolutePath());
+                            }
+                        } catch (Exception e) {
+                            log.error("代码保存失败: {}", e.getMessage());
+                        }
+
+                        generationTaskManager.completeTask(appId);
+                        sink.complete();
                     })
-                    .doOnError(error -> {
-                        log.error("代码生成失败: {}", error.getMessage());
+                    .onError((Throwable error) -> {
+                        error.printStackTrace();
                         generationTaskManager.completeTask(appId);
                         sink.error(error);
                     })
-                    .subscribe();
-            
-            // 注册任务，传递部分内容收集器
-            generationTaskManager.registerTask(appId, codeGenType.getValue(), disposable, sink, userId, partialContentBuilder);
+                    .start();
         });
     }
 
@@ -199,9 +227,10 @@ public class AiCodeGeneratorFacade {
      * @param tokenStream TokenStream 对象
      * @param appId 应用ID
      * @param userId 用户ID
+     * @param codeGenType 代码生成类型
      * @return Flux<String> 流式响应
      */
-    private Flux<String> processTokenStream(TokenStream tokenStream, Long appId, Long userId) {
+    private Flux<String> processTokenStream(TokenStream tokenStream, Long appId, Long userId, CodeGenTypeEnum codeGenType) {
         // 部分内容收集器，用于取消时保存已生成的内容
         StringBuilder partialContentBuilder = new StringBuilder();
         
@@ -209,7 +238,7 @@ public class AiCodeGeneratorFacade {
             // 注册任务到管理器
             Disposable disposable = Flux.never().subscribe(); // 占位符，实际取消逻辑在TokenStream中
             
-            generationTaskManager.registerTask(appId, "VUE_PROJECT", disposable, sink, userId, partialContentBuilder);
+            generationTaskManager.registerTask(appId, codeGenType.getValue(), disposable, sink, userId, partialContentBuilder);
             
             tokenStream.onPartialResponse((String partialResponse) -> {
                         AiResponseMessage aiResponseMessage = new AiResponseMessage(partialResponse);
@@ -253,9 +282,27 @@ public class AiCodeGeneratorFacade {
                             log.error("统计用户token消耗失败: userId={}, error={}", userId, e.getMessage(), e);
                         }
 
-                        // 执行 Vue 项目构建（同步执行，确保预览时项目已就绪）
-                        String projectPath = AppConstant.CODE_OUTPUT_ROOT_DIR + "/vue_project_" + appId;
-                        vueProjectBuilder.buildProject(projectPath);
+                        // 根据代码生成类型执行不同的后处理逻辑
+                        try {
+                            if (codeGenType == CodeGenTypeEnum.VUE_PROJECT) {
+                                // Vue项目异步构建，避免阻塞流式响应
+                                String projectPath = AppConstant.CODE_OUTPUT_ROOT_DIR + "/vue_project_" + appId;
+                                vueProjectBuilder.buildProjectAsync(projectPath);
+                                log.info("Vue项目构建已启动（异步）: {}", projectPath);
+                            } else if (codeGenType == CodeGenTypeEnum.HTML || codeGenType == CodeGenTypeEnum.MULTI_FILE) {
+                                // HTML和MULTI_FILE类型的代码保存
+                                String completeCode = partialContentBuilder.toString();
+                                if (completeCode != null && !completeCode.trim().isEmpty()) {
+                                    // 使用执行器解析代码
+                                    Object parsedResult = CodeParserExecutor.executeParser(completeCode, codeGenType);
+                                    // 使用执行器保存代码
+                                    File saveDir = CodeFileSaverExecutor.executeSaver(parsedResult, codeGenType, appId);
+                                    log.info("保存成功，目录为：{}", saveDir.getAbsolutePath());
+                                }
+                            }
+                        } catch (Exception e) {
+                            log.error("代码保存失败: {}", e.getMessage());
+                        }
 
                         generationTaskManager.completeTask(appId);
                         sink.complete();

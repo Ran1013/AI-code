@@ -27,14 +27,14 @@
         <div class="user-login-status">
           <div v-if="loginUserStore.loginUser.id" class="user-status-container">
             <!-- 用户状态徽章（独立显示，不参与下拉菜单） -->
-            <a-tag v-if="tokenInfo && tokenInfo.userRole === 'admin'" color="green">
+            <a-tag v-if="tokenInfoStore.tokenInfo && tokenInfoStore.tokenInfo.userRole === 'admin'" color="green">
               管理员
             </a-tag>
-            <a-tag v-else-if="tokenInfo && tokenInfo.userRole === 'member'" color="orange">
+            <a-tag v-else-if="tokenInfoStore.tokenInfo && tokenInfoStore.tokenInfo.userRole === 'member'" color="orange">
               会员
             </a-tag>
-            <a-tag v-else-if="tokenInfo" :color="getTokenTagColor(tokenInfo)">
-              使用量: {{ tokenInfo.usedTokens }}/{{ tokenInfo.totalTokens }}
+            <a-tag v-else-if="tokenInfoStore.tokenInfo" :color="getTokenTagColor(tokenInfoStore.tokenInfo)">
+              使用量: {{ tokenInfoStore.tokenInfo.usedTokens }}/{{ tokenInfoStore.tokenInfo.totalTokens }}
             </a-tag>
             <a-tag v-else color="default">
               加载中...
@@ -70,52 +70,34 @@
 </template>
 
 <script setup lang="ts">
-import { computed, h, ref, onMounted } from 'vue'
+import { computed, h, ref, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { type MenuProps, message } from 'ant-design-vue'
 import { useLoginUserStore } from '../stores/loginUser'
-import { userLogout, getUserTokenInfo } from '../api/userController'
+import { useTokenInfoStore } from '../stores/tokenInfo'
+import { userLogout } from '../api/userController'
 import { LogoutOutlined, HomeOutlined, UserOutlined, StarOutlined } from '@ant-design/icons-vue'
 
 const loginUserStore = useLoginUserStore()
+const tokenInfoStore = useTokenInfoStore()
 const router = useRouter()
 // 当前选中菜单
 const selectedKeys = ref<string[]>(['/'])
-// token信息
-const tokenInfo = ref<API.User | null>(null)
 // 监听路由变化，更新当前选中菜单
 router.afterEach((to, from, next) => {
   selectedKeys.value = [to.path]
 })
 
-// 获取token信息
-const loadTokenInfo = async () => {
-  console.log('GlobalHeader: 开始获取token信息')
-  console.log('GlobalHeader: 当前用户信息:', loginUserStore.loginUser)
-  
-  if (loginUserStore.loginUser.id) {
-    try {
-      const res = await getUserTokenInfo()
-      console.log('GlobalHeader: API响应:', res)
-      if (res.data && res.data.code === 0 && res.data.data) {
-        tokenInfo.value = res.data.data
-        console.log('GlobalHeader: token信息设置成功:', tokenInfo.value)
-      } else {
-        console.error('GlobalHeader: API返回错误:', res.data)
-        // API失败时不设置token信息，让模板显示加载状态
-        tokenInfo.value = null
-        console.log('GlobalHeader: API失败，token信息设置为null')
-      }
-    } catch (error) {
-      console.error('GlobalHeader: 获取token信息失败:', error)
-      // 网络错误时不设置token信息，让模板显示加载状态
-      tokenInfo.value = null
-      console.log('GlobalHeader: 网络错误，token信息设置为null')
-    }
-  } else {
-    console.log('GlobalHeader: 用户未登录，跳过token信息获取')
+// 监听用户登录状态变化，自动刷新token信息
+watch(() => loginUserStore.loginUser.id, async (newUserId, oldUserId) => {
+  if (newUserId && newUserId !== oldUserId) {
+    // 用户登录或切换用户时，刷新token信息
+    await tokenInfoStore.refreshTokenInfo()
+  } else if (!newUserId) {
+    // 用户退出登录时，清空token信息
+    tokenInfoStore.setTokenInfo(null)
   }
-}
+}, { immediate: true })
 
 // 根据token使用量计算标识颜色
 const getTokenTagColor = (tokenInfo: API.User) => {
@@ -146,7 +128,10 @@ onMounted(async () => {
   if (!loginUserStore.loginUser.id) {
     await loginUserStore.fetchLoginUser()
   }
-  loadTokenInfo()
+  // 如果用户已登录，获取token信息
+  if (loginUserStore.loginUser.id) {
+    await tokenInfoStore.refreshTokenInfo()
+  }
 })
 
 // 菜单配置项
