@@ -10,6 +10,7 @@ import com.ran.aicode.model.entity.User;
 import com.ran.aicode.model.enums.ChatHistoryMessageTypeEnum;
 import com.ran.aicode.model.enums.ChatHistoryStatusEnum;
 import com.ran.aicode.service.ChatHistoryService;
+import com.ran.aicode.core.util.ErrorMessageUtils;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -64,9 +65,15 @@ public class JsonMessageStreamHandler {
                     chatHistoryService.addChatMessage(appId, aiResponse, ChatHistoryMessageTypeEnum.AI.getValue(), loginUser.getId(), ChatHistoryStatusEnum.NORMAL.getValue(),null);
                 })
                 .doOnError(error -> {
-                    // 如果AI回复失败，也要记录错误消息
-                    String errorMessage = "AI回复失败: " + error.getMessage();
-                    chatHistoryService.addChatMessage(appId, errorMessage, ChatHistoryMessageTypeEnum.AI.getValue(), loginUser.getId(),ChatHistoryStatusEnum.AI_INTERRUPTED.getValue(),null);
+                    // 使用ErrorMessageUtils简化错误信息，隐藏技术细节
+                    String detailedError = error.getMessage();
+                    String userFriendlyMessage = ErrorMessageUtils.sanitize(detailedError);
+                    
+                    // 记录详细错误到日志
+                    log.error("AI回复失败，保存错误信息到数据库: appId={}, userId={}, error={}", appId, loginUser.getId(), detailedError);
+                    
+                    // 保存用户友好的错误信息到聊天历史
+                    chatHistoryService.addChatMessage(appId, userFriendlyMessage, ChatHistoryMessageTypeEnum.AI.getValue(), loginUser.getId(),ChatHistoryStatusEnum.AI_INTERRUPTED.getValue(),null);
                 });
     }
 

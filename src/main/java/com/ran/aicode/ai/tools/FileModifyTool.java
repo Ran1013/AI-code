@@ -30,8 +30,17 @@ public class FileModifyTool extends BaseTool {
             String oldContent,
             @P("替换后的新内容")
             String newContent,
-            @ToolMemoryId Long appId
+            @ToolMemoryId Object appIdObj
     ) {
+        // 将Object类型的appId转换为Long
+        Long appId;
+        if (appIdObj instanceof Long) {
+            appId = (Long) appIdObj;
+        } else if (appIdObj instanceof Number) {
+            appId = ((Number) appIdObj).longValue();
+        } else {
+            throw new IllegalArgumentException("Invalid appId type: " + appIdObj.getClass());
+        }
         try {
             Path path = Paths.get(relativeFilePath);
             if (!path.isAbsolute()) {

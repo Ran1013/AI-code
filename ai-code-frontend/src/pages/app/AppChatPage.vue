@@ -860,15 +860,24 @@ const loadChatHistory = async (loadMore = false) => {
       const historyMessages = historyData.records || []
       
       // 转换历史消息格式
-      const formattedMessages: Message[] = historyMessages.map(msg => ({
-        id: msg.id,
-        messageType: msg.messageType === 'user' ? 'user' : 'ai',
-        content: msg.message || '',
-        createTime: msg.createTime,
-        userName: msg.userName,
-        status: msg.status,
-        type: msg.type || 'text', // 映射后端的type字段，text-文字，image-图片
-      }))
+      const formattedMessages: Message[] = historyMessages.map(msg => {
+        let content = msg.message || '';
+        
+        // 如果是AI消息且状态为异常中断，过滤技术错误信息
+        if (msg.messageType === 'ai' && msg.status === 2) {
+          content = sanitizeErrorMessage(content);
+        }
+        
+        return {
+          id: msg.id,
+          messageType: msg.messageType === 'user' ? 'user' : 'ai',
+          content: content,
+          createTime: msg.createTime,
+          userName: msg.userName,
+          status: msg.status,
+          type: msg.type || 'text', // 映射后端的type字段，text-文字，image-图片
+        };
+      })
 
       if (loadMore) {
         // 加载更多时，将新消息插入到现有消息前面
@@ -1286,6 +1295,49 @@ const stopGeneration = async () => {
     }
   }
 }
+
+// 错误信息清洗函数（对应后端的ErrorMessageUtils.sanitize）
+const sanitizeErrorMessage = (rawMessage: string): string => {
+  if (!rawMessage || rawMessage.trim() === '') {
+    return '系统错误，请稍后重试';
+  }
+  
+  const msg = rawMessage.toLowerCase();
+  
+  // 常见错误信息清洗
+  if (msg.includes('range of input length')) {
+    return '输入内容过长，请精简到 6000 字符以内';
+  }
+  if (msg.includes('range of max_tokens') || msg.includes('max_tokens')) {
+    return '生成长度超出限制，请减少输出长度或分段生成';
+  }
+  if (msg.includes('tool_calls') && msg.includes('must be followed')) {
+    return '模型调用工具异常，请重试';
+  }
+  if (msg.includes('internal_server_error') || msg.includes('internalerror')) {
+    return '服务繁忙，请稍后重试';
+  }
+  if (msg.includes('nullpointerexception') || msg.includes('null')) {
+    return '系统处理异常，请重试';
+  }
+  if (msg.includes('argument type mismatch') || msg.includes('type mismatch')) {
+    return '参数处理异常，请重试';
+  }
+  if (msg.includes('tool') && msg.includes('execution')) {
+    return '功能调用异常，请重试';
+  }
+  if (msg.includes('cannot invoke') && msg.includes('null')) {
+    return '系统处理异常，请重试';
+  }
+  if (msg.includes('ai回复失败:')) {
+    // 如果是"AI回复失败:"开头的消息，提取后面的错误信息进行清洗
+    const errorPart = rawMessage.substring(rawMessage.indexOf('AI回复失败:') + 6);
+    return sanitizeErrorMessage(errorPart);
+  }
+  
+  // 默认友好错误信息
+  return '系统错误，请稍后重试';
+};
 
 // 错误处理函数
 const handleError = (error: unknown, aiMessageIndex: number) => {
