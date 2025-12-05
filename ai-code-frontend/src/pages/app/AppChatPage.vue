@@ -519,7 +519,7 @@ const previewIframe = ref<HTMLIFrameElement>()
 
 // WebSocket连接
 const connectWebSocket = () => {
-  if (!appId.value || !isTeamApp.value) return
+  if (!appId.value) return
 
   try {
     // 构建WebSocket URL
@@ -687,6 +687,13 @@ const handleWebSocketMessage = (data: any) => {
       // 处理错误消息
       console.error('WebSocket错误:', data.message)
       message.error(data.message || 'WebSocket连接出现错误')
+      break
+
+    case 'VUE_BUILD_COMPLETE':
+      // Vue项目构建完成，立即更新预览
+      console.log('Vue项目构建完成，更新预览')
+      message.success('网站生成完成，正在加载预览...')
+      updatePreview()
       break
   }
 }
@@ -1169,7 +1176,7 @@ const generateCode = async (userMessage: string, aiMessageIndex: number, imageUr
     })
 
     // 处理done事件
-    currentEventSource.addEventListener('done', function () {
+    currentEventSource.addEventListener('done', async function () {
       if (streamCompleted) return
 
       streamCompleted = true
@@ -1193,11 +1200,8 @@ const generateCode = async (userMessage: string, aiMessageIndex: number, imageUr
         })
       }
 
-      // 延迟更新预览，确保后端已完成处理
-      setTimeout(async () => {
-        await fetchAppInfo()
-        updatePreview()
-      }, 1000)
+      // 不在此处更新预览，由WebSocket VUE_BUILD_COMPLETE消息驱动
+      // 在done事件触发时，buildProjectAsync()才刚刚开始，还需等待30秒+的构建时间
     })
 
     // 处理错误
@@ -1399,14 +1403,22 @@ const handleError = (error: unknown, aiMessageIndex: number) => {
   }
 }
 
+// 生成带缓存破坏参数的预览地址，确保 iframe 真正重新加载
+const buildPreviewUrlWithCacheBusting = (baseUrl: string) => {
+  const separator = baseUrl.includes('?') ? '&' : '?'
+  return `${baseUrl}${separator}t=${Date.now()}`
+}
+
 // 更新预览
 const updatePreview = () => {
-  if (appId.value) {
-    const codeGenType = appInfo.value?.codeGenType || CodeGenTypeEnum.HTML
-    const newPreviewUrl = getStaticPreviewUrl(codeGenType, appId.value)
-    previewUrl.value = newPreviewUrl
-    previewReady.value = true
+  if (!appId.value) {
+    return
   }
+
+  const codeGenType = appInfo.value?.codeGenType || CodeGenTypeEnum.HTML
+  const baseUrl = getStaticPreviewUrl(codeGenType, appId.value)
+  previewReady.value = false
+  previewUrl.value = buildPreviewUrlWithCacheBusting(baseUrl)
 }
 
 // 滚动到底部

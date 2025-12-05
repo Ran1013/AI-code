@@ -1,8 +1,10 @@
 package com.ran.aicode.core.builder;
 
 import cn.hutool.core.util.RuntimeUtil;
+import com.ran.aicode.websocket.AppEditHandler;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
+import jakarta.annotation.Resource;
 
 import java.io.File;
 import java.io.FileWriter;
@@ -16,16 +18,27 @@ import java.util.concurrent.TimeUnit;
 @Component
 public class VueProjectBuilder {
 
+    @Resource
+    private AppEditHandler appEditHandler;
+
     /**
      * 异步构建 Vue 项目
      *
      * @param projectPath
+     * @param appId
+     * @param userId
      */
-    public void buildProjectAsync(String projectPath) {
+    public void buildProjectAsync(String projectPath, Long appId, Long userId) {
         Thread.ofVirtual().name("vue-builder-" + System.currentTimeMillis())
                 .start(() -> {
                     try {
-                        buildProject(projectPath);
+                        if (buildProject(projectPath)) {
+                            // 构建成功，发送通知
+                            appEditHandler.notifyVueBuildComplete(appId);
+                            log.info("Vue项目构建完成通知已发送: appId={}", appId);
+                        } else {
+                            log.error("Vue项目构建失败: appId={}", appId);
+                        }
                     } catch (Exception e) {
                         log.error("异步构建 Vue 项目时发生异常: {}", e.getMessage(), e);
                     }

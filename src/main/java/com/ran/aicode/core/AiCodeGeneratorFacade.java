@@ -304,7 +304,7 @@ public class AiCodeGeneratorFacade {
                             if (codeGenType == CodeGenTypeEnum.VUE_PROJECT) {
                                 // Vue项目异步构建，避免阻塞流式响应
                                 String projectPath = AppConstant.CODE_OUTPUT_ROOT_DIR + "/vue_project_" + appId;
-                                vueProjectBuilder.buildProjectAsync(projectPath);
+                                vueProjectBuilder.buildProjectAsync(projectPath, appId, userId);
                                 log.info("Vue项目构建已启动（异步）: {}", projectPath);
                             } else if (codeGenType == CodeGenTypeEnum.HTML || codeGenType == CodeGenTypeEnum.MULTI_FILE) {
                                 // HTML和MULTI_FILE类型的代码保存
@@ -391,7 +391,7 @@ public class AiCodeGeneratorFacade {
                         try {
                             if (codeGenType == CodeGenTypeEnum.VUE_PROJECT) {
                                 String projectPath = AppConstant.CODE_OUTPUT_ROOT_DIR + "/vue_project_" + appId;
-                                vueProjectBuilder.buildProjectAsync(projectPath);
+                                vueProjectBuilder.buildProjectAsync(projectPath, appId, userId);
                                 log.info("Vue项目构建已启动（异步）: {}", projectPath);
                             }
                         } catch (Exception e) {
