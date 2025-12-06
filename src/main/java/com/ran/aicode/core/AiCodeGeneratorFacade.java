@@ -190,6 +190,13 @@ public class AiCodeGeneratorFacade {
                         log.debug("忽略工具执行结果: {}", toolExecution.request().name());
                     })
                     .onCompleteResponse((ChatResponse response) -> {
+                        if (response == null) {
+                            log.warn("收到空的完整响应，跳过处理");
+                            generationTaskManager.completeTask(appId);
+                            sink.complete();
+                            return;
+                        }
+
                         // 统计并更新用户token消耗
                         try {
                             dev.langchain4j.model.output.TokenUsage tokenUsage = response.metadata().tokenUsage();
@@ -198,7 +205,7 @@ public class AiCodeGeneratorFacade {
                                 Long inputTokens = tokenUsage.inputTokenCount() != null ? tokenUsage.inputTokenCount() : 0L;
                                 Long outputTokens = tokenUsage.outputTokenCount() != null ? tokenUsage.outputTokenCount() : 0L;
                                 Long consumedTokens = inputTokens + outputTokens;
-                                
+
                                 if (consumedTokens > 0) {
                                     boolean success = tokenService.consumeTokens(userId, consumedTokens);
                                     if (success) {
@@ -277,6 +284,13 @@ public class AiCodeGeneratorFacade {
                         sink.next(JSONUtil.toJsonStr(toolExecutedMessage));
                     })
                     .onCompleteResponse((ChatResponse response) -> {
+                        if (response == null) {
+                            log.warn("收到空的完整响应，跳过处理");
+                            generationTaskManager.completeTask(appId);
+                            sink.complete();
+                            return;
+                        }
+
                         // 统计并更新用户token消耗
                         try {
                             dev.langchain4j.model.output.TokenUsage tokenUsage = response.metadata().tokenUsage();
@@ -285,7 +299,7 @@ public class AiCodeGeneratorFacade {
                                 Long inputTokens = tokenUsage.inputTokenCount() != null ? tokenUsage.inputTokenCount() : 0L;
                                 Long outputTokens = tokenUsage.outputTokenCount() != null ? tokenUsage.outputTokenCount() : 0L;
                                 Long consumedTokens = inputTokens + outputTokens;
-                                
+
                                 if (consumedTokens > 0) {
                                     boolean success = tokenService.consumeTokens(userId, consumedTokens);
                                     if (success) {
@@ -361,6 +375,13 @@ public class AiCodeGeneratorFacade {
                         sink.next(JSONUtil.toJsonStr(toolExecutedMessage));
                     })
                     .onCompleteResponse((ChatResponse response) -> {
+                        if (response == null) {
+                            log.warn("收到空的完整响应，跳过处理");
+                            generationTaskManager.completeTask(appId);
+                            sink.complete();
+                            return;
+                        }
+
                         try {
                             dev.langchain4j.model.output.TokenUsage tokenUsage = response.metadata().tokenUsage();
                             if (tokenUsage != null) {

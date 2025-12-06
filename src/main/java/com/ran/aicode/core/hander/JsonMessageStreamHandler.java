@@ -54,26 +54,46 @@ public class JsonMessageStreamHandler {
         Set<String> seenToolIds = new HashSet<>();
         return originFlux
                 .map(chunk -> {
-                    // 解析每个 JSON 消息块
-                    return handleJsonMessageChunk(chunk, chatHistoryStringBuilder, seenToolIds);
+                    try {
+                        // 解析每个 JSON 消息块
+                        return handleJsonMessageChunk(chunk, chatHistoryStringBuilder, seenToolIds);
+                    } catch (Exception e) {
+                        log.error("处理消息块失败: {}, chunk={}", e.getMessage(), StrUtil.maxLength(chunk, 200), e);
+                        // 返回空字符串而不是抛出异常，确保流继续
+                        return "";
+                    }
                 })
                 .filter(StrUtil::isNotEmpty) // 过滤空字串
                 .doOnComplete(() -> {
-                    //判断消息状态
-                    // 流式响应完成后，添加 AI 消息到对话历史
-                    String aiResponse = chatHistoryStringBuilder.toString();
-                    chatHistoryService.addChatMessage(appId, aiResponse, ChatHistoryMessageTypeEnum.AI.getValue(), loginUser.getId(), ChatHistoryStatusEnum.NORMAL.getValue(),null);
+                    try {
+                        //判断消息状态
+                        // 流式响应完成后，添加 AI 消息到对话历史
+                        String aiResponse = chatHistoryStringBuilder.toString();
+                        chatHistoryService.addChatMessage(appId, aiResponse, ChatHistoryMessageTypeEnum.AI.getValue(), loginUser.getId(), ChatHistoryStatusEnum.NORMAL.getValue(),null);
+                    } catch (Exception e) {
+                        log.error("流完成时保存聊天历史失败: appId={}, userId={}, error={}", appId, loginUser.getId(), e.getMessage(), e);
+                    }
                 })
                 .doOnError(error -> {
-                    // 使用ErrorMessageUtils简化错误信息，隐藏技术细节
-                    String detailedError = error.getMessage();
-                    String userFriendlyMessage = ErrorMessageUtils.sanitize(detailedError);
-                    
-                    // 记录详细错误到日志
-                    log.error("AI回复失败，保存错误信息到数据库: appId={}, userId={}, error={}", appId, loginUser.getId(), detailedError);
-                    
-                    // 保存用户友好的错误信息到聊天历史
-                    chatHistoryService.addChatMessage(appId, userFriendlyMessage, ChatHistoryMessageTypeEnum.AI.getValue(), loginUser.getId(),ChatHistoryStatusEnum.AI_INTERRUPTED.getValue(),null);
+                    try {
+                        // 使用ErrorMessageUtils简化错误信息，隐藏技术细节
+                        String detailedError = error.getMessage();
+                        String userFriendlyMessage = ErrorMessageUtils.sanitize(detailedError);
+
+                        // 记录详细错误到日志
+                        log.error("AI回复失败，保存错误信息到数据库: appId={}, userId={}, error={}", appId, loginUser.getId(), detailedError);
+
+                        // 保存用户友好的错误信息到聊天历史
+                        chatHistoryService.addChatMessage(appId, userFriendlyMessage, ChatHistoryMessageTypeEnum.AI.getValue(), loginUser.getId(),ChatHistoryStatusEnum.AI_INTERRUPTED.getValue(),null);
+                    } catch (Exception e) {
+                        log.error("保存错误信息到数据库失败: appId={}, userId={}, error={}", appId, loginUser.getId(), e.getMessage(), e);
+                    }
+                })
+                // 添加错误恢复，确保流不会被意外中断
+                .onErrorResume(throwable -> {
+                    log.error("流处理发生错误，但继续执行: appId={}, userId={}, error={}", appId, loginUser.getId(), throwable.getMessage(), throwable);
+                    // 返回空流而不是错误，避免前端中断
+                    return Flux.empty();
                 });
     }
 

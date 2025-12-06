@@ -51,6 +51,8 @@ public class AiCodeGeneratorServiceFactory {
                 .maxMessages(10)
                 .build();
         // 从数据库加载历史对话到记忆中
+        // 注意：maxMessages(10)确保加载5对完整的user-ai对话
+        // loadChatHistoryToMemory会验证并修复消息顺序
         chatHistoryService.loadChatHistoryToMemory(appId, chatMemory, 10);
         // 根据代码生成类型选择不同的模型配置
         return switch (codeGenType) {

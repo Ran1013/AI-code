@@ -18,6 +18,8 @@ import com.ran.aicode.service.UserService;
 import com.mybatisflex.core.query.QueryWrapper;
 import com.mybatisflex.spring.service.impl.ServiceImpl;
 import dev.langchain4j.data.message.AiMessage;
+import dev.langchain4j.data.message.ChatMessage;
+import dev.langchain4j.data.message.ChatMessageType;
 import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.memory.chat.MessageWindowChatMemory;
 import jakarta.annotation.Resource;
@@ -243,6 +245,43 @@ public class ChatHistoryServiceImpl extends ServiceImpl<ChatHistoryMapper, ChatH
             chatMemory.clear();
             // 按 onlyId 分组并处理
             int loadedCount = processGroupedHistory(historyList, chatMemory);
+
+            // 验证并修复消息顺序（确保符合OpenAI API规范）
+            validateAndFixMessageOrder(chatMemory);
+
+            // === 诊断日志：打印加载的消息顺序 ===
+            if (loadedCount > 0) {
+                List<ChatMessage> messages = chatMemory.messages();
+                log.info("=== 开始诊断历史消息 appId: {} ===", appId);
+                log.info("历史消息总数: {}", messages.size());
+
+                for (int i = 0; i < messages.size(); i++) {
+                    ChatMessage msg = messages.get(i);
+                    // 根据消息类型获取文本内容
+                    String preview = "[类型:" + msg.type() + "]";
+                    if (msg instanceof UserMessage) {
+                        UserMessage userMsg = (UserMessage) msg;
+                        String text = userMsg.singleText();
+                        preview = text != null ? text.substring(0, Math.min(100, text.length())) : "[无内容]";
+                    } else if (msg instanceof AiMessage) {
+                        AiMessage aiMsg = (AiMessage) msg;
+                        String text = aiMsg.text();
+                        preview = text != null ? text.substring(0, Math.min(100, text.length())) : "[无内容]";
+                    }
+                    log.info("Message[{}]: type={}, preview={}", i, msg.type(), preview);
+                }
+
+                // 检查最后一条消息类型
+                ChatMessage lastMsg = messages.get(messages.size() - 1);
+                if (lastMsg.type() != ChatMessageType.USER) {
+                    log.error("❌ 消息顺序异常：最后一条消息不是USER类型，而是 {}", lastMsg.type());
+                } else {
+                    log.info("✅ 消息顺序正常：最后一条消息是USER类型");
+                }
+
+                log.info("=== 诊断结束 ===");
+            }
+
             log.info("成功为 appId: {} 加载了 {} 条历史对话", appId, loadedCount);
             return loadedCount;
         } catch (Exception e) {
@@ -350,6 +389,82 @@ public class ChatHistoryServiceImpl extends ServiceImpl<ChatHistoryMapper, ChatH
             log.error("添加消息到聊天记忆失败，messageType: {}, message: {}, error: {}", 
                     messageType, message, e.getMessage(), e);
             return false;
+        }
+    }
+
+    /**
+     * 验证并修复消息顺序，确保符合OpenAI API规范
+     *
+     * 规则：
+     * 1. 最后一条消息必须是USER类型（因为接下来会添加AI响应）
+     * 2. USER和AI消息必须严格交替
+     *
+     * @param chatMemory 聊天记忆对象
+     */
+    private void validateAndFixMessageOrder(MessageWindowChatMemory chatMemory) {
+        List<ChatMessage> messages = chatMemory.messages();
+
+        if (messages.isEmpty()) {
+            log.debug("消息列表为空，无需验证顺序");
+            return;
+        }
+
+        int originalSize = messages.size();
+
+        // 规则1：最后一条消息必须是USER类型
+        // 如果不是，移除末尾的非USER消息，直到最后一条是USER或列表为空
+        while (!messages.isEmpty()) {
+            ChatMessage lastMessage = messages.get(messages.size() - 1);
+            if (lastMessage.type() == ChatMessageType.USER) {
+                break; // 找到USER消息，停止移除
+            }
+
+            // 获取消息预览内容
+            String preview = "[无内容]";
+            if (lastMessage instanceof UserMessage) {
+                UserMessage userMsg = (UserMessage) lastMessage;
+                String text = userMsg.singleText();
+                preview = text != null ? text.substring(0, Math.min(50, text.length())) : "[无内容]";
+            } else if (lastMessage instanceof AiMessage) {
+                AiMessage aiMsg = (AiMessage) lastMessage;
+                String text = aiMsg.text();
+                preview = text != null ? text.substring(0, Math.min(50, text.length())) : "[无内容]";
+            }
+
+            log.warn("消息顺序修复：移除末尾的非USER消息，type={}, content preview={}",
+                lastMessage.type(), preview);
+
+            messages.remove(messages.size() - 1);
+        }
+
+        if (messages.isEmpty()) {
+            log.warn("消息顺序修复后列表为空，所有消息都不是USER类型");
+            return;
+        }
+
+        // 规则2：验证USER-AI交替顺序（仅警告，不修复）
+        for (int i = 0; i < messages.size() - 1; i++) {
+            ChatMessage current = messages.get(i);
+            ChatMessage next = messages.get(i + 1);
+
+            boolean isValidSequence =
+                (current.type() == ChatMessageType.USER &&
+                 next.type() == ChatMessageType.AI) ||
+                (current.type() == ChatMessageType.AI &&
+                 next.type() == ChatMessageType.USER);
+
+            if (!isValidSequence) {
+                log.error("❌ 消息交替顺序异常：Message[{}]={}, Message[{}]={}",
+                    i, current.type(), i + 1, next.type());
+            }
+        }
+
+        int fixedSize = messages.size();
+        if (originalSize != fixedSize) {
+            log.info("消息顺序修复完成：原始数量={}, 修复后数量={}, 移除了{}条消息",
+                originalSize, fixedSize, originalSize - fixedSize);
+        } else {
+            log.debug("消息顺序验证通过，无需修复");
         }
     }
 
