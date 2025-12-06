@@ -114,6 +114,18 @@ public class ChatHistoryServiceImpl extends ServiceImpl<ChatHistoryMapper, ChatH
         // 验证消息类型是否有效
         ChatHistoryMessageTypeEnum messageTypeEnum = ChatHistoryMessageTypeEnum.getEnumByValue(messageType);
         ThrowUtils.throwIf(messageTypeEnum == null, ErrorCode.PARAMS_ERROR, "不支持的消息类型: " + messageType);
+
+        // 记录消息长度，监控长消息
+        int messageLength = message.length();
+        int messageBytes = message.getBytes().length;
+        if (messageLength > 50000) {
+            log.warn("长消息警告: appId={}, messageType={}, 字符数={}, 字节数={}",
+                    appId, messageType, messageLength, messageBytes);
+        } else if (messageLength > 20000) {
+            log.info("中等长度消息: appId={}, messageType={}, 字符数={}, 字节数={}",
+                    appId, messageType, messageLength, messageBytes);
+        }
+
         //相同消息生成唯一键,表示同一条消息
         String jsonStr = appId + message + messageType + userId + status;
         String onlyId = DigestUtil.md5Hex(jsonStr);

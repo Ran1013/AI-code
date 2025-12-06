@@ -73,6 +73,12 @@ public class ToolExecutionRequestBuilder {
     public ToolExecutionRequest build() {
         // TODO store it till complete response?
         String arguments = this.arguments.toString();
+
+        // 集成 JSON 修复逻辑：清洁并修复工具参数
+        if (!arguments.isEmpty()) {
+            arguments = ToolExecutionRequestUtil.tryRepair(arguments);
+        }
+
         ToolExecutionRequest toolExecutionRequest = ToolExecutionRequest.builder()
                 .id(id.get())
                 .name(name.get())
