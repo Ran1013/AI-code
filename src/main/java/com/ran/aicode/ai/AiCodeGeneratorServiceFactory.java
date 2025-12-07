@@ -48,12 +48,12 @@ public class AiCodeGeneratorServiceFactory {
                 .builder()
                 .id(appId)
                 .chatMemoryStore(redisChatMemoryStore)
-                .maxMessages(50)
+                .maxMessages(120)
                 .build();
         // 从数据库加载历史对话到记忆中
-        // 注意：maxMessages(50)确保最多保留25对完整的user-ai对话
+        // 注意：maxMessages(120)确保最多保留60对完整的user-ai对话
         // loadChatHistoryToMemory会验证并修复消息顺序
-        chatHistoryService.loadChatHistoryToMemory(appId, chatMemory, 50);
+        chatHistoryService.loadChatHistoryToMemory(appId, chatMemory, 120);
         // 根据代码生成类型选择不同的模型配置
         return switch (codeGenType) {
             case VUE_PROJECT -> {
@@ -64,7 +64,7 @@ public class AiCodeGeneratorServiceFactory {
                         .streamingChatModel(reasoningStreamingChatModel)
                         .chatMemoryProvider(memoryId -> chatMemory)
                         .tools((Object[]) toolManager.getAllTools())
-                .maxSequentialToolsInvocations(15)
+                .maxSequentialToolsInvocations(30)
 //                        .inputGuardrails(new PromptSafetyInputGuardrail())
                 .hallucinatedToolNameStrategy(toolExecutionRequest -> ToolExecutionResultMessage.from(
                         toolExecutionRequest, "Error: there is no tool called " + toolExecutionRequest.name()
@@ -79,7 +79,7 @@ public class AiCodeGeneratorServiceFactory {
                         .streamingChatModel(openAiStreamingChatModel)
                         .chatMemoryProvider(memoryId -> chatMemory)
                         .tools((Object[]) toolManager.getAllTools())
-                        .maxSequentialToolsInvocations(15)
+                        .maxSequentialToolsInvocations(30)
 //                        .inputGuardrails(new PromptSafetyInputGuardrail()) // 添加输入护轨
                         .hallucinatedToolNameStrategy(toolExecutionRequest -> ToolExecutionResultMessage.from(
                                 toolExecutionRequest, "Error: there is no tool called " + toolExecutionRequest.name()
