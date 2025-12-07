@@ -48,27 +48,27 @@ public class AiCodeGeneratorServiceFactory {
                 .builder()
                 .id(appId)
                 .chatMemoryStore(redisChatMemoryStore)
-                .maxMessages(10)
+                .maxMessages(50)
                 .build();
         // 从数据库加载历史对话到记忆中
-        // 注意：maxMessages(10)确保加载5对完整的user-ai对话
+        // 注意：maxMessages(50)确保最多保留25对完整的user-ai对话
         // loadChatHistoryToMemory会验证并修复消息顺序
-        chatHistoryService.loadChatHistoryToMemory(appId, chatMemory, 10);
+        chatHistoryService.loadChatHistoryToMemory(appId, chatMemory, 50);
         // 根据代码生成类型选择不同的模型配置
         return switch (codeGenType) {
             case VUE_PROJECT -> {
-                // 使用多例模式的 StreamingChatModel 解决并发问题（VUE 项目生成链路保留流式 + 工具能力）
+                // 使用多例模式的 StreamingChatModel 解决并发问题（VUE 项目生成链路保留流式）
                 StreamingChatModel reasoningStreamingChatModel = SpringContextUtil.getBean("reasoningStreamingChatModelPrototype", StreamingChatModel.class);
                 yield AiServices.builder(AiCodeGeneratorService.class)
                         .chatModel(chatModel) // 添加非流式chatModel用于generateAppName
                         .streamingChatModel(reasoningStreamingChatModel)
                         .chatMemoryProvider(memoryId -> chatMemory)
                         .tools((Object[]) toolManager.getAllTools())
-                        .maxSequentialToolsInvocations(15)
+                .maxSequentialToolsInvocations(15)
 //                        .inputGuardrails(new PromptSafetyInputGuardrail())
-                        .hallucinatedToolNameStrategy(toolExecutionRequest -> ToolExecutionResultMessage.from(
-                                toolExecutionRequest, "Error: there is no tool called " + toolExecutionRequest.name()
-                        ))
+                .hallucinatedToolNameStrategy(toolExecutionRequest -> ToolExecutionResultMessage.from(
+                        toolExecutionRequest, "Error: there is no tool called " + toolExecutionRequest.name()
+                ))
                         .build();
             }
             case HTML, MULTI_FILE -> {
