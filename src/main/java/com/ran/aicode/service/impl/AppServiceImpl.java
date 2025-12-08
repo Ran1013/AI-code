@@ -25,8 +25,6 @@ import com.ran.aicode.model.enums.*;
 import com.ran.aicode.model.vo.AppVO;
 import com.ran.aicode.service.*;
 import com.ran.aicode.service.TokenService;
-import com.ran.aicode.config.properties.TokenEstimateProperties;
-import com.ran.aicode.util.TokenEstimator;
 import com.jd.platform.hotkey.client.callback.JdHotKeyStore;
 import com.mybatisflex.core.query.QueryWrapper;
 import com.mybatisflex.spring.service.impl.ServiceImpl;
@@ -87,12 +85,7 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
     @Resource
     private TokenService tokenService;
 
-    @Resource
-    private TokenEstimateProperties tokenEstimateProperties;
-
-    @Resource
-    private TokenEstimator tokenEstimator;
-
+  
     @Override
     public Flux<String> chatToGenCode(Long appId, String message, User loginUser, List<String> images, boolean force) {
         // 1. 参数校验
@@ -160,55 +153,17 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
      * 基于配置估算本次生成所需 token（软拦截用）。
      */
     private long estimateRequiredTokens(String message, String codeGenType) {
-        // 获取对应的prompt文件路径
-        String promptPath = getPromptPath(codeGenType);
-
-        // 从配置文件读取参数
-        double base, multiplier, bufferRate;
-
-        if (CodeGenTypeEnum.HTML.getValue().equals(codeGenType)) {
-            base = tokenEstimateProperties.getHtml().getBase();
-            multiplier = tokenEstimateProperties.getHtml().getMultiplier();
-            bufferRate = tokenEstimateProperties.getHtml().getBufferRate();
-        } else if (CodeGenTypeEnum.MULTI_FILE.getValue().equals(codeGenType)) {
-            base = tokenEstimateProperties.getMulti().getBase();
-            multiplier = tokenEstimateProperties.getMulti().getMultiplier();
-            bufferRate = tokenEstimateProperties.getMulti().getBufferRate();
+        // 默认值兜底（与 application-prod.yml 一致）
+        double base = 1200, multiplier = 1.0, bufferRate = 0.15;
+        if (CodeGenTypeEnum.MULTI_FILE.getValue().equals(codeGenType)) {
+            base = 6000; multiplier = 2.0; bufferRate = 0.15;
         } else if (CodeGenTypeEnum.VUE_PROJECT.getValue().equals(codeGenType)) {
-            base = tokenEstimateProperties.getVue().getBase();
-            multiplier = tokenEstimateProperties.getVue().getMultiplier();
-            bufferRate = tokenEstimateProperties.getVue().getBufferRate();
-        } else {
-            // 默认值
-            base = 1200; multiplier = 1.0; bufferRate = 0.15;
-            promptPath = null;
+            base = 15000; multiplier = 3.5; bufferRate = 0.2;
         }
-
-        // 使用TokenEstimator进行更准确的估算
-        if (promptPath != null) {
-            return tokenEstimator.estimateTotalTokens(
-                message, promptPath, base, multiplier, bufferRate);
-        } else {
-            // 降级到简单估算
-            int promptLen = message != null ? message.length() : 0;
-            double estimate = base + (promptLen / 3.0) * multiplier;
-            estimate = Math.ceil(estimate * (1.0 + bufferRate));
-            return Math.max(100, (long) estimate);
-        }
-    }
-
-    /**
-     * 获取对应代码生成类型的prompt文件路径
-     */
-    private String getPromptPath(String codeGenType) {
-        if (CodeGenTypeEnum.HTML.getValue().equals(codeGenType)) {
-            return "prompt/codegen-html-system-prompt.txt";
-        } else if (CodeGenTypeEnum.MULTI_FILE.getValue().equals(codeGenType)) {
-            return "prompt/codegen-multi-file-system-prompt.txt";
-        } else if (CodeGenTypeEnum.VUE_PROJECT.getValue().equals(codeGenType)) {
-            return "prompt/codegen-vue-project-system-prompt.txt";
-        }
-        return null;
+        int promptLen = message != null ? message.length() : 0;
+        double estimate = base + (promptLen / 3.0) * multiplier;
+        estimate = Math.ceil(estimate * (1.0 + bufferRate));
+        return Math.max(100, (long) estimate);
     }
 
     /**
