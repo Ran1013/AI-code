@@ -307,8 +307,15 @@
             <a-spin size="large" />
             <p>{{ otherGeneratingUser.userName }} 正在生成网站...</p>
           </div>
+          <div v-else-if="isVueBuilding" class="preview-loading">
+            <a-spin size="large" />
+            <p>正在构建网站，请稍候...</p>
+            <div class="build-tips">
+              <p>Vue项目需要额外的构建时间，通常需要30秒左右</p>
+            </div>
+          </div>
           <iframe
-            v-else
+            v-else-if="!isVueBuilding"
             ref="previewIframe"
             :src="previewUrl"
             class="preview-iframe"
@@ -461,6 +468,9 @@ const messages = ref<Message[]>([])
 const userInput = ref('')
 const isGenerating = ref(false)
 const messagesContainer = ref<HTMLElement>()
+
+// Vue项目构建状态
+const isVueBuilding = ref(false)
 
 // 上传相关状态
 const uploadedImages = ref<string[]>([])
@@ -692,6 +702,7 @@ const handleWebSocketMessage = (data: any) => {
     case 'VUE_BUILD_COMPLETE':
       // Vue项目构建完成，立即更新预览
       console.log('Vue项目构建完成，更新预览')
+      isVueBuilding.value = false
       message.success('网站生成完成，正在加载预览...')
       updatePreview()
       break
@@ -1187,6 +1198,12 @@ const generateCode = async (userMessage: string, aiMessageIndex: number, imageUr
       // 获取最新的token信息并更新到消息中
       updateTokenInfoForMessage(aiMessageIndex)
 
+      // 检查是否是Vue项目，如果是则设置构建状态
+      const codeGenType = appInfo.value?.codeGenType || CodeGenTypeEnum.HTML
+      if (codeGenType === CodeGenTypeEnum.VUE_PROJECT) {
+        isVueBuilding.value = true
+      }
+
       // 只在团队应用中发送退出编辑状态消息
       if (isTeamApp.value) {
         sendWebSocketMessage({
@@ -1200,8 +1217,10 @@ const generateCode = async (userMessage: string, aiMessageIndex: number, imageUr
         })
       }
 
-      // 不在此处更新预览，由WebSocket VUE_BUILD_COMPLETE消息驱动
-      // 在done事件触发时，buildProjectAsync()才刚刚开始，还需等待30秒+的构建时间
+      // 非Vue项目立即更新预览，Vue项目等待VUE_BUILD_COMPLETE消息
+      if (codeGenType !== CodeGenTypeEnum.VUE_PROJECT) {
+        updatePreview()
+      }
     })
 
     // 处理错误
@@ -2185,6 +2204,18 @@ onUnmounted(() => {
 
 .preview-loading p {
   margin-top: 16px;
+  font-size: 16px;
+}
+
+.build-tips {
+  margin-top: 8px;
+  text-align: center;
+}
+
+.build-tips p {
+  font-size: 14px;
+  color: #999;
+  margin: 4px 0;
 }
 
 .preview-iframe {
