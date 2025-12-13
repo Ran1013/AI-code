@@ -253,10 +253,11 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         updateApp.setDeployedTime(LocalDateTime.now());
         boolean updateResult = this.updateById(updateApp);
         ThrowUtils.throwIf(!updateResult, ErrorCode.OPERATION_ERROR, "更新应用部署信息失败");
-        // 10. 得到可访问的 URL 地址
+        // 10. 得到可访问的 URL 地址（对外短链：/{deployKey} -> 301 -> /example/static/{deployKey}/）
         String appDeployUrl = String.format("%s/%s", AppConstant.CODE_DEPLOY_HOST, deployKey);
-        // 11. 异步生成截图并且更新应用封面
-        generateAppScreenshotAsync(appId, appDeployUrl);
+        // 11. 异步生成截图并且更新应用封面（截图入口仅本机可访问，避免 Sa-Token 登录态依赖）
+        String screenshotUrl = String.format("%s/inner/screenshot/%s", AppConstant.CODE_DEPLOY_HOST, deployKey);
+        generateAppScreenshotAsync(appId, screenshotUrl);
         return appDeployUrl;
     }
 
