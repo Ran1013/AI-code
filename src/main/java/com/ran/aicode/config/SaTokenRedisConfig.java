@@ -24,15 +24,8 @@ public class SaTokenRedisConfig implements WebMvcConfigurer {
      */
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
-        // 注册 Sa-Token 拦截器，打开注解式鉴权功能
-        registry.addInterceptor(new SaInterceptor(handle -> {
-            // 指定需要登录认证的路径
-            SaRouter.match("/**")
-                    .notMatch("/user/sendVerify","/user/login", "/user/register", "/user/get/login")
-                    .notMatch("/doc.html", "/webjars/**", "/swagger-resources/**", "/v3/api-docs/**")
-                    .notMatch("/ws/**") // WebSocket 连接路径
-                    .check(r -> StpUtil.checkLogin());
-        })).addPathPatterns("/**");
+        // 暂时禁用拦截器，使用过滤器进行认证
+        // registry.addInterceptor(new SaInterceptor());
     }
 
     /**
@@ -43,11 +36,25 @@ public class SaTokenRedisConfig implements WebMvcConfigurer {
         return new SaServletFilter()
                 .addInclude("/**")
                 .addExclude("/favicon.ico")
+                .addExclude("/doc.html")
+                .addExclude("/webjars/**")
+                .addExclude("/swagger-resources/**")
+                .addExclude("/v3/api-docs/**")
+                .addExclude("/v3/api-docs/swagger-config")
+                .addExclude("/swagger-ui.html")
+                .addExclude("/swagger-ui/**")
+                .addExclude("/swagger-ui/index.html")
+                .addExclude("/v2/api-docs/**")
+                .addExclude("/knife4j/**")
                 .setAuth(obj -> {
                     // 登录认证 -- 拦截所有路由，并排除 /user/login 等接口
                     SaRouter.match("/**")
                             .notMatch("/user/sendVerify","/user/login", "/user/register", "/user/get/login")
                             .notMatch("/doc.html", "/webjars/**", "/swagger-resources/**", "/v3/api-docs/**")
+                            .notMatch("/v3/api-docs/swagger-config")
+                            .notMatch("/swagger-ui.html", "/swagger-ui/**", "/swagger-ui/index.html")
+                            .notMatch("/v2/api-docs/**")
+                            .notMatch("/knife4j/**")
                             .notMatch("/ws/**") // WebSocket 连接路径
                             .check(r -> StpUtil.checkLogin());
                 })
