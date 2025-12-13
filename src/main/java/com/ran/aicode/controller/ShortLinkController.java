@@ -13,8 +13,12 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 public class ShortLinkController {
 
-    @GetMapping("/{deployKey}")
+    @GetMapping("/{deployKey:^[^.]+$}")
     public ResponseEntity<Void> redirect(@PathVariable String deployKey) {
+        // 排除特定的路径
+        if ("doc".equals(deployKey) || "swagger".equals(deployKey) || "api-docs".equals(deployKey)) {
+            return ResponseEntity.notFound().build();
+        }
         String target = "/example/static/" + deployKey + "/";
         HttpHeaders headers = new HttpHeaders();
         headers.add("Location", target);
