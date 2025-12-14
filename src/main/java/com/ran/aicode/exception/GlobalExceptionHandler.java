@@ -60,7 +60,7 @@ public class GlobalExceptionHandler {
         String accept = request.getHeader("Accept");
         String uri = request.getRequestURI();
         if ((accept != null && accept.contains("text/event-stream")) ||
-                uri.contains("/chat/gen/code")) {
+                uri.contains("/chat/gen/code") || uri.contains("/chat/code")) {
             try {
                 // 检查响应是否已提交，避免"getOutputStream() has already been called"错误
                 if (response.isCommitted()) {

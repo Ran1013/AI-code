@@ -99,8 +99,7 @@ public class AiCodeGeneratorFacade {
         AiCodeGeneratorService aiCodeGeneratorService = aiCodeGeneratorServiceFactory.getAiCodeGeneratorService(appId, codeGenTypeEnum);
         return switch (codeGenTypeEnum) {
             case HTML -> {
-                TokenStream tokenStream = aiCodeGeneratorService.generateHtmlCodeStream(appId, userMessage);
-                yield processTokenStreamForSimpleText(tokenStream, appId, userId, CodeGenTypeEnum.HTML);
+                yield generateHtmlWithRetryStream(aiCodeGeneratorService, userMessage, appId, userId);
             }
             case MULTI_FILE -> {
                 TokenStream tokenStream = aiCodeGeneratorService.generateMultiFileCodeStream(appId, userMessage);
@@ -168,25 +167,21 @@ public class AiCodeGeneratorFacade {
     private Flux<String> processTokenStreamForSimpleText(TokenStream tokenStream, Long appId, Long userId, CodeGenTypeEnum codeGenType) {
         // 部分内容收集器，用于取消时保存已生成的内容
         StringBuilder partialContentBuilder = new StringBuilder();
-        
+
         return Flux.create((FluxSink<String> sink) -> {
             // 注册任务到管理器
             Disposable disposable = Flux.never().subscribe(); // 占位符，实际取消逻辑在TokenStream中
-            
+
             generationTaskManager.registerTask(appId, codeGenType.getValue(), disposable, sink, userId, partialContentBuilder);
-            
+
             tokenStream.onPartialResponse((String partialResponse) -> {
-                        // 收集部分内容
                         partialContentBuilder.append(partialResponse);
-                        // 直接返回文本内容，不包装成JSON
                         sink.next(partialResponse);
                     })
                     .onPartialToolExecutionRequest((index, toolExecutionRequest) -> {
-                        // 对于HTML和多文件模式，忽略工具调用请求，不向用户显示
                         log.debug("忽略工具调用请求: {}", toolExecutionRequest.name());
                     })
                     .onToolExecuted((ToolExecution toolExecution) -> {
-                        // 对于HTML和多文件模式，忽略工具执行结果，不向用户显示
                         log.debug("忽略工具执行结果: {}", toolExecution.request().name());
                     })
                     .onCompleteResponse((ChatResponse response) -> {
@@ -201,11 +196,9 @@ public class AiCodeGeneratorFacade {
                         try {
                             dev.langchain4j.model.output.TokenUsage tokenUsage = response.metadata().tokenUsage();
                             if (tokenUsage != null) {
-                                // 计算总token消耗（input + output）
                                 Long inputTokens = tokenUsage.inputTokenCount() != null ? tokenUsage.inputTokenCount() : 0L;
                                 Long outputTokens = tokenUsage.outputTokenCount() != null ? tokenUsage.outputTokenCount() : 0L;
                                 Long consumedTokens = inputTokens + outputTokens;
-
                                 if (consumedTokens > 0) {
                                     boolean success = tokenService.consumeTokens(userId, consumedTokens);
                                     if (success) {
@@ -219,18 +212,119 @@ public class AiCodeGeneratorFacade {
                             log.error("统计用户token消耗失败: userId={}, error={}", userId, e.getMessage(), e);
                         }
 
-                        // 保存代码
+                        // 保存代码：失败必须透传给前端（让 SSE 走 business-error）
+                        String completeCode = partialContentBuilder.toString();
+                        if (completeCode != null && !completeCode.trim().isEmpty()) {
+                            Object parsedResult = CodeParserExecutor.executeParser(completeCode, codeGenType);
+                            File saveDir = CodeFileSaverExecutor.executeSaver(parsedResult, codeGenType, appId);
+                            log.info("保存成功，目录为：{}", saveDir.getAbsolutePath());
+                        }
+
+                        generationTaskManager.completeTask(appId);
+                        sink.complete();
+                    })
+                    .onError((Throwable error) -> {
+                        error.printStackTrace();
+                        generationTaskManager.completeTask(appId);
+                        sink.error(error);
+                    })
+                    .start();
+        });
+    }
+
+    private static final String HTML_RETRY_APPEND_PROMPT = "\n\n" +
+            "【严格输出要求】\n" +
+            "1) 只允许输出一个代码块，且必须是 ```html 开头、``` 结尾。\n" +
+            "2) 代码必须包含 <!DOCTYPE html> 或 <html>，并且是完整可运行的单文件页面。\n" +
+            "3) 代码块之外禁止输出任何解释、清单、说明文字。\n";
+
+    /**
+     * HTML 模式：失败自动重试一次。
+     */
+    private Flux<String> generateHtmlWithRetryStream(AiCodeGeneratorService aiCodeGeneratorService, String userMessage, Long appId, Long userId) {
+        TokenStream first = aiCodeGeneratorService.generateHtmlCodeStream(appId, userMessage);
+        return processHtmlTokenStreamWithRetry(first, aiCodeGeneratorService, userMessage, appId, userId, false);
+    }
+
+    private Flux<String> processHtmlTokenStreamWithRetry(TokenStream tokenStream,
+                                                        AiCodeGeneratorService aiCodeGeneratorService,
+                                                        String originalUserMessage,
+                                                        Long appId,
+                                                        Long userId,
+                                                        boolean isRetry) {
+        StringBuilder partialContentBuilder = new StringBuilder();
+        CodeGenTypeEnum codeGenType = CodeGenTypeEnum.HTML;
+
+        return Flux.create((FluxSink<String> sink) -> {
+            Disposable disposable = Flux.never().subscribe();
+            generationTaskManager.registerTask(appId, codeGenType.getValue(), disposable, sink, userId, partialContentBuilder);
+
+            tokenStream.onPartialResponse((String partialResponse) -> {
+                        partialContentBuilder.append(partialResponse);
+                        sink.next(partialResponse);
+                    })
+                    .onPartialToolExecutionRequest((index, toolExecutionRequest) -> {
+                        log.debug("忽略工具调用请求: {}", toolExecutionRequest.name());
+                    })
+                    .onToolExecuted((ToolExecution toolExecution) -> {
+                        log.debug("忽略工具执行结果: {}", toolExecution.request().name());
+                    })
+                    .onCompleteResponse((ChatResponse response) -> {
+                        if (response == null) {
+                            log.warn("收到空的完整响应，跳过处理");
+                            generationTaskManager.completeTask(appId);
+                            sink.complete();
+                            return;
+                        }
+
+                        // 统计并更新用户token消耗（保持与原逻辑一致）
                         try {
-                            String completeCode = partialContentBuilder.toString();
-                            if (completeCode != null && !completeCode.trim().isEmpty()) {
-                                // 使用执行器解析代码
-                                Object parsedResult = CodeParserExecutor.executeParser(completeCode, codeGenType);
-                                // 使用执行器保存代码
-                                File saveDir = CodeFileSaverExecutor.executeSaver(parsedResult, codeGenType, appId);
-                                log.info("保存成功，目录为：{}", saveDir.getAbsolutePath());
+                            dev.langchain4j.model.output.TokenUsage tokenUsage = response.metadata().tokenUsage();
+                            if (tokenUsage != null) {
+                                Long inputTokens = tokenUsage.inputTokenCount() != null ? tokenUsage.inputTokenCount() : 0L;
+                                Long outputTokens = tokenUsage.outputTokenCount() != null ? tokenUsage.outputTokenCount() : 0L;
+                                Long consumedTokens = inputTokens + outputTokens;
+                                if (consumedTokens > 0) {
+                                    boolean success = tokenService.consumeTokens(userId, consumedTokens);
+                                    if (success) {
+                                        log.info("用户 {} 消耗token成功，消耗: {}", userId, consumedTokens);
+                                    } else {
+                                        log.warn("用户 {} 消耗token失败，消耗: {}", userId, consumedTokens);
+                                    }
+                                }
                             }
                         } catch (Exception e) {
-                            log.error("代码保存失败: {}", e.getMessage());
+                            log.error("统计用户token消耗失败: userId={}, error={}", userId, e.getMessage(), e);
+                        }
+
+                        String completeCode = partialContentBuilder.toString();
+                        if (completeCode != null && !completeCode.trim().isEmpty()) {
+                            try {
+                                Object parsedResult = CodeParserExecutor.executeParser(completeCode, codeGenType);
+                                File saveDir = CodeFileSaverExecutor.executeSaver(parsedResult, codeGenType, appId);
+                                log.info("保存成功，目录为：{}", saveDir.getAbsolutePath());
+
+                                generationTaskManager.completeTask(appId);
+                                sink.complete();
+                                return;
+                            } catch (com.ran.aicode.exception.BusinessException e) {
+                                // HTML 解析/校验失败：自动重试一次
+                                if (!isRetry) {
+                                    log.warn("HTML 解析失败，准备重试一次: appId={}, error={}", appId, e.getMessage());
+                                    generationTaskManager.completeTask(appId);
+
+                                    String retryMessage = originalUserMessage + HTML_RETRY_APPEND_PROMPT;
+                                    TokenStream retryStream = aiCodeGeneratorService.generateHtmlCodeStream(appId, retryMessage);
+
+                                    processHtmlTokenStreamWithRetry(retryStream, aiCodeGeneratorService, originalUserMessage, appId, userId, true)
+                                            .subscribe(sink::next, sink::error, sink::complete);
+                                    return;
+                                }
+                                // 已重试仍失败：抛出异常给上层，让 GlobalExceptionHandler 输出 business-error
+                                generationTaskManager.completeTask(appId);
+                                sink.error(e);
+                                return;
+                            }
                         }
 
                         generationTaskManager.completeTask(appId);

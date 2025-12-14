@@ -16,15 +16,32 @@ public class HtmlCodeParser implements CodeParser<HtmlCodeResult> {
     @Override
     public HtmlCodeResult parseCode(String codeContent) {
         HtmlCodeResult result = new HtmlCodeResult();
-        // 提取 HTML 代码
+        // 提取 fenced 的 HTML 代码块（严格模式）
         String htmlCode = extractHtmlCode(codeContent);
-        if (htmlCode != null && !htmlCode.trim().isEmpty()) {
-            result.setHtmlCode(htmlCode.trim());
-        } else {
-            // 如果没有找到代码块，将整个内容作为HTML
-            result.setHtmlCode(codeContent.trim());
+        if (htmlCode == null || htmlCode.trim().isEmpty()) {
+            throw new com.ran.aicode.exception.BusinessException(
+                    com.ran.aicode.exception.ErrorCode.SYSTEM_ERROR,
+                    "HTML 代码提取失败：未找到 ```html ... ``` 代码块"
+            );
         }
+        String trimmed = htmlCode.trim();
+        if (!looksLikeCompleteHtml(trimmed)) {
+            throw new com.ran.aicode.exception.BusinessException(
+                    com.ran.aicode.exception.ErrorCode.SYSTEM_ERROR,
+                    "HTML 代码提取失败：代码块缺少 <!DOCTYPE html> 或 <html>"
+            );
+        }
+        result.setHtmlCode(trimmed);
         return result;
+    }
+
+    /**
+     * 判断提取出来的内容是否像完整 HTML 文档。
+     * 这里使用严格规则：必须包含 <!DOCTYPE html> 或 <html>。
+     */
+    private boolean looksLikeCompleteHtml(String html) {
+        String lower = html.toLowerCase();
+        return lower.contains("<!doctype html") || lower.contains("<html");
     }
 
     /**
