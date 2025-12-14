@@ -99,6 +99,19 @@ public class AppController {
                             .data(jsonData)
                             .build();
                 })
+                .onErrorResume(e -> {
+                    // SSE 已开始返回时，全局异常处理器可能无法写入，这里在链路内部兜底输出 business-error
+                    String messageText = e != null && StrUtil.isNotBlank(e.getMessage()) ? e.getMessage() : "系统错误";
+                    String errorJson = JSONUtil.toJsonStr(Map.of(
+                            "error", "true",
+                            "code", String.valueOf(ErrorCode.SYSTEM_ERROR.getCode()),
+                            "message", messageText
+                    ));
+                    return Flux.just(
+                            ServerSentEvent.<String>builder().event("business-error").data(errorJson).build(),
+                            ServerSentEvent.<String>builder().event("done").data("").build()
+                    );
+                })
                 .concatWith(Mono.just(
                         // 发送结束事件
                         ServerSentEvent.<String>builder()
