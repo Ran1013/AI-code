@@ -47,6 +47,7 @@ public class SaTokenRedisConfig implements WebMvcConfigurer {
                 .addExclude("/v2/api-docs/**")
                 .addExclude("/knife4j/**")
                 .addExclude("/inner/screenshot/**")
+                .addExclude("/static/**")
                 .setAuth(obj -> {
                     // 登录认证 -- 拦截所有路由，并排除 /user/login 等接口
                     SaRouter.match("/**")
@@ -57,6 +58,7 @@ public class SaTokenRedisConfig implements WebMvcConfigurer {
                             .notMatch("/v2/api-docs/**")
                             .notMatch("/knife4j/**")
                             .notMatch("/inner/screenshot/**")
+                            .notMatch("/static/**")
                             .notMatch("/ws/**") // WebSocket 连接路径
                             .check(r -> StpUtil.checkLogin());
                 })

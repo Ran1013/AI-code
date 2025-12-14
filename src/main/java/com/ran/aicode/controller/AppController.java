@@ -276,6 +276,17 @@ public class AppController {
         Page<AppVO> appVOPage = new Page<>(pageNum, pageSize, appPage.getTotalRow());
         List<AppVO> appVOList = appService.getAppVOList(appPage.getRecords());
         appVOPage.setRecords(appVOList);
+
+        // 诊断：用于定位“封面显示为错误页”到底是后端返回的 cover 就不对，还是前端渲染/缓存问题
+        try {
+            String sample = appVOList.stream().limit(3)
+                    .map(vo -> String.format("id=%s, deployKey=%s, cover=%s", vo.getId(), vo.getDeployKey(), vo.getCover()))
+                    .reduce((a, b) -> a + " | " + b)
+                    .orElse("<empty>");
+            log.info("我的作品列表返回：userId={}, total={}, sample={}", loginUser.getId(), appVOList.size(), sample);
+        } catch (Exception ignore) {
+        }
+
         return ResultUtils.success(appVOPage);
     }
 

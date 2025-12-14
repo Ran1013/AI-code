@@ -1,6 +1,5 @@
 package com.ran.aicode.controller;
 
-import cn.dev33.satoken.annotation.SaCheckLogin;
 import com.ran.aicode.constant.AppConstant;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
@@ -36,7 +35,6 @@ public class StaticResourceController {
      * 支持Vue项目的dist目录访问
      */
     @GetMapping("/{deployKey:[a-zA-Z0-9_-]+}/**")
-    @SaCheckLogin
     public ResponseEntity<Resource> serveStaticResource(
             @PathVariable String deployKey,
             HttpServletRequest request) {

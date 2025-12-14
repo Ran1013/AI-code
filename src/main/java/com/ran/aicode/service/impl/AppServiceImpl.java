@@ -255,8 +255,10 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         ThrowUtils.throwIf(!updateResult, ErrorCode.OPERATION_ERROR, "更新应用部署信息失败");
         // 10. 得到可访问的 URL 地址（对外短链：/{deployKey} -> 301 -> /example/static/{deployKey}/）
         String appDeployUrl = String.format("%s/%s", AppConstant.CODE_DEPLOY_HOST, deployKey);
-        // 11. 异步生成截图并且更新应用封面（截图入口仅本机可访问，避免 Sa-Token 登录态依赖）
-        String screenshotUrl = String.format("%s/inner/screenshot/%s", AppConstant.CODE_DEPLOY_HOST, deployKey);
+        // 11. 异步生成截图并且更新应用封面
+        // 说明：/inner/screenshot/{deployKey} 在当前工程中未实现，会导致 404（Whitelabel Error Page），截图内容错误。
+        // 这里直接对可访问的静态资源地址 /static/{deployKey}/ 进行截图。
+        String screenshotUrl = String.format("%s/static/%s/", AppConstant.CODE_DEPLOY_HOST, deployKey);
         generateAppScreenshotAsync(appId, screenshotUrl);
         return appDeployUrl;
     }
@@ -271,14 +273,20 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
     public void generateAppScreenshotAsync(Long appId, String appUrl) {
         // 使用虚拟线程并执行
         Thread.startVirtualThread(() -> {
-            // 调用截图服务生成截图并上传
-            String screenshotUrl = screenshotService.generateAndUploadScreenshot(appUrl);
-            // 更新数据库的封面
-            App updateApp = new App();
-            updateApp.setId(appId);
-            updateApp.setCover(screenshotUrl);
-            boolean updated = this.updateById(updateApp);
-            ThrowUtils.throwIf(!updated, ErrorCode.OPERATION_ERROR, "更新应用封面字段失败");
+            try {
+                // 调用截图服务生成截图并上传
+                String screenshotUrl = screenshotService.generateAndUploadScreenshot(appUrl);
+                log.info("应用 {} 截图生成完成，截图URL：{}", appId, screenshotUrl);
+                // 更新数据库的封面
+                App updateApp = new App();
+                updateApp.setId(appId);
+                updateApp.setCover(screenshotUrl);
+                boolean updated = this.updateById(updateApp);
+                ThrowUtils.throwIf(!updated, ErrorCode.OPERATION_ERROR, "更新应用封面字段失败");
+                log.info("应用 {} 封面字段更新成功", appId);
+            } catch (Exception e) {
+                log.error("应用 {} 生成/更新封面失败，截图入口URL：{}", appId, appUrl, e);
+            }
         });
     }
 
