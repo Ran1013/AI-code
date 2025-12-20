@@ -10,6 +10,7 @@ import com.ran.aicode.common.ResultUtils;
 import com.ran.aicode.constant.AppConstant;
 import com.ran.aicode.constant.UserConstant;
 import com.ran.aicode.core.AiCodeGeneratorFacade;
+import com.ran.aicode.exception.BusinessException;
 import com.ran.aicode.exception.ErrorCode;
 import com.ran.aicode.exception.ThrowUtils;
 import com.ran.aicode.manager.auth.AppUserAuthManager;
@@ -44,6 +45,7 @@ import reactor.core.publisher.Mono;
 
 import java.io.File;
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -414,6 +416,9 @@ public class AppController {
     @Resource
     private ProjectDownloadService projectDownloadService;
 
+    @Resource
+    private com.ran.aicode.core.builder.VueProjectBuilder vueProjectBuilder;
+
     /**
      * 下载应用代码
      *
@@ -442,6 +447,75 @@ public class AppController {
         String downloadFileName = String.valueOf(appId);
         // 7. 调用通用下载服务
         projectDownloadService.downloadProjectAsZip(sourceDirPath, downloadFileName, response);
+    }
+
+    /**
+     * 获取Vue项目构建状态
+     *
+     * @param appId 应用ID
+     * @return 构建状态信息
+     */
+    @GetMapping("/{appId}/vue-build-status")
+    public BaseResponse<Map<String, Object>> getVueBuildStatus(@PathVariable Long appId, HttpServletRequest request) {
+        // 参数校验
+        if (appId == null || appId <= 0) {
+            return new BaseResponse<>(ErrorCode.PARAMS_ERROR.getCode(), null, "应用ID不能为空");
+        }
+
+        // 获取当前登录用户
+        User loginUser;
+        try {
+            loginUser = userService.getLoginUser(request);
+        } catch (Exception e) {
+            throw new BusinessException(ErrorCode.NOT_LOGIN_ERROR);
+        }
+
+        Map<String, Object> result = new HashMap<>();
+
+        try {
+            // 获取构建状态
+            com.ran.aicode.core.builder.VueProjectBuilder.BuildStatus buildStatus = vueProjectBuilder.getBuildStatus(appId);
+
+            // 检查应用是否存在
+            App app = appService.getById(appId);
+            ThrowUtils.throwIf(app == null, ErrorCode.NOT_FOUND_ERROR, "应用不存在");
+
+            result.put("appId", appId);
+            result.put("buildStatus", buildStatus.getText());
+            result.put("timestamp", System.currentTimeMillis());
+
+            // 如果构建完成，检查构建产物
+            if (buildStatus == com.ran.aicode.core.builder.VueProjectBuilder.BuildStatus.SUCCESS) {
+                String projectPath = AppConstant.CODE_OUTPUT_ROOT_DIR + "/vue_project_" + appId;
+                File distDir = new File(projectPath, "dist");
+                result.put("hasBuildDir", distDir.exists() && distDir.isDirectory());
+
+                if (distDir.exists() && distDir.isDirectory()) {
+                    File[] files = distDir.listFiles();
+                    result.put("buildFiles", files != null ? files.length : 0);
+
+                    // 检查是否有index.html
+                    File indexFile = new File(distDir, "index.html");
+                    result.put("hasIndexHtml", indexFile.exists() && indexFile.isFile());
+                }
+            } else {
+                result.put("hasBuildDir", false);
+                result.put("buildFiles", 0);
+                result.put("hasIndexHtml", false);
+            }
+
+            return ResultUtils.success(result);
+
+        } catch (Exception e) {
+            log.error("获取Vue构建状态失败: appId={}, error={}", appId, e.getMessage(), e);
+            Map<String, Object> errorResult = new HashMap<>();
+            errorResult.put("appId", appId);
+            errorResult.put("status", "ERROR");
+            errorResult.put("statusText", "查询失败");
+            errorResult.put("timestamp", System.currentTimeMillis());
+            errorResult.put("error", e.getMessage());
+            return new BaseResponse<>(ErrorCode.SYSTEM_ERROR.getCode(), errorResult, "获取Vue构建状态失败");
+        }
     }
 
 }

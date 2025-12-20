@@ -312,6 +312,7 @@
             <p>正在构建网站，请稍候...</p>
             <div class="build-tips">
               <p>Vue项目需要额外的构建时间，通常需要30秒左右</p>
+              <p>如果长时间未显示预览，请刷新网页</p>
             </div>
           </div>
           <iframe
@@ -703,7 +704,7 @@ const handleWebSocketMessage = (data: any) => {
       // Vue项目构建完成，立即更新预览
       console.log('Vue项目构建完成，更新预览')
       isVueBuilding.value = false
-      message.success('网站生成完成，正在加载预览...')
+      message.success('网站构建完成！正在显示预览...')
       updatePreview()
       break
   }

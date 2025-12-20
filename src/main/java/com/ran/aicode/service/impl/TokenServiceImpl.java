@@ -49,8 +49,8 @@ public class TokenServiceImpl implements TokenService {
             return false;
         }
 
-        // 管理员和会员不消耗token
-        if (isAdminUser(userId)) {
+        // 管理员和会员都不消耗token
+        if (isAdminUser(userId) || isMemberUser(userId)) {
             log.info("管理员或会员用户 {} 不消耗token", userId);
             return true;
         }
@@ -121,8 +121,8 @@ public class TokenServiceImpl implements TokenService {
         }
 
         User user = getUserTokenInfo(userId);
-        // 管理员和会员都不受token限制
-        return user != null && ("admin".equals(user.getUserRole()) || "member".equals(user.getUserRole()));
+        // 只有管理员不受token限制
+        return user != null && "admin".equals(user.getUserRole());
     }
 
     @Override

@@ -9,6 +9,8 @@ import jakarta.annotation.Resource;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -22,6 +24,49 @@ public class VueProjectBuilder {
     private AppEditHandler appEditHandler;
 
     /**
+     * 构建状态枚举
+     */
+    public enum BuildStatus {
+        BUILDING("构建中"),
+        SUCCESS("构建成功"),
+        FAILED("构建失败");
+
+        private final String text;
+
+        BuildStatus(String text) {
+            this.text = text;
+        }
+
+        public String getText() {
+            return text;
+        }
+    }
+
+    /**
+     * 构建状态管理
+     */
+    private static final Map<Long, BuildStatus> buildStatusMap = new ConcurrentHashMap<>();
+
+    /**
+     * 获取构建状态
+     *
+     * @param appId 应用ID
+     * @return 构建状态
+     */
+    public BuildStatus getBuildStatus(Long appId) {
+        return buildStatusMap.getOrDefault(appId, BuildStatus.FAILED);
+    }
+
+    /**
+     * 清理构建状态
+     *
+     * @param appId 应用ID
+     */
+    public void clearBuildStatus(Long appId) {
+        buildStatusMap.remove(appId);
+    }
+
+    /**
      * 异步构建 Vue 项目
      *
      * @param projectPath
@@ -29,19 +74,60 @@ public class VueProjectBuilder {
      * @param userId
      */
     public void buildProjectAsync(String projectPath, Long appId, Long userId) {
+        // 设置构建状态
+        buildStatusMap.put(appId, BuildStatus.BUILDING);
+        log.info("开始异步构建Vue项目: appId={}, 状态={}", appId, BuildStatus.BUILDING.getText());
+
         Thread.ofVirtual().name("vue-builder-" + System.currentTimeMillis())
                 .start(() -> {
+                    boolean success = false;
                     try {
-                        if (buildProject(projectPath)) {
-                            // 构建成功，发送通知
-                            appEditHandler.notifyVueBuildComplete(appId);
-                            log.info("Vue项目构建完成通知已发送: appId={}", appId);
+                        success = buildProject(projectPath);
+
+                        if (success) {
+                            buildStatusMap.put(appId, BuildStatus.SUCCESS);
+                            log.info("Vue项目构建成功: appId={}, 状态={}", appId, BuildStatus.SUCCESS.getText());
                         } else {
-                            log.error("Vue项目构建失败: appId={}", appId);
+                            buildStatusMap.put(appId, BuildStatus.FAILED);
+                            log.error("Vue项目构建失败: appId={}, 状态={}", appId, BuildStatus.FAILED.getText());
                         }
                     } catch (Exception e) {
-                        log.error("异步构建 Vue 项目时发生异常: {}", e.getMessage(), e);
+                        buildStatusMap.put(appId, BuildStatus.FAILED);
+                        log.error("异步构建 Vue 项目时发生异常: appId={}, error={}", appId, e.getMessage(), e);
                     }
+
+                    // 多重试通知机制
+                    for (int i = 0; i < 3; i++) {
+                        try {
+                            appEditHandler.notifyVueBuildComplete(appId);
+                            log.info("Vue构建完成通知已发送: appId={}, 尝试={}/3, 成功={}", appId, i + 1, success);
+                            if (i < 2) {
+                                Thread.sleep(1000); // 等待1秒再重试
+                            }
+                            break; // 发送成功就退出
+                        } catch (Exception e) {
+                            log.warn("发送Vue构建完成通知失败，重试: appId={}, 尝试={}/3, error={}", appId, i + 1, e.getMessage());
+                            if (i < 2) {
+                                try {
+                                    Thread.sleep(1000); // 等待1秒后重试
+                                } catch (InterruptedException ie) {
+                                    Thread.currentThread().interrupt();
+                                    break;
+                                }
+                            }
+                        }
+                    }
+
+                    // 30分钟后清理状态
+                    Thread.ofVirtual().start(() -> {
+                        try {
+                            Thread.sleep(TimeUnit.MINUTES.toMillis(30));
+                            buildStatusMap.remove(appId);
+                            log.info("已清理过期的构建状态: appId={}", appId);
+                        } catch (InterruptedException e) {
+                            Thread.currentThread().interrupt();
+                        }
+                    });
                 });
     }
 

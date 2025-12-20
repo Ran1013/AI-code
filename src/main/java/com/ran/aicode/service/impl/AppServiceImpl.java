@@ -126,8 +126,9 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
 
         // 8. 调用 AI 生成代码（流式）
         Flux<String> codeStream;
-        if (loginUser.getUserRole().equals(UserRoleEnum.MEMBER.getValue())) {
-            // 会员：走工作流（无限制）
+        String userRole = loginUser.getUserRole();
+        if (UserRoleEnum.MEMBER.getValue().equals(userRole) || UserRoleEnum.ADMIN.getValue().equals(userRole)) {
+            // 会员和管理员：走工作流（无限制）
             codeStream = new CodeGenConcurrentWorkflow().executeWorkflowWithFlux(fullMessage, appId, loginUser.getId());
         } else if (codeGenTypeEnum == CodeGenTypeEnum.VUE_PROJECT) {
             // 普通用户 + Vue：预占

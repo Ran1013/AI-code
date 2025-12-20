@@ -7,6 +7,7 @@ import com.ran.aicode.exception.ErrorCode;
 import com.ran.aicode.langgraph4j.state.WorkflowContext;
 import com.ran.aicode.model.enums.CodeGenTypeEnum;
 import com.ran.aicode.utils.SpringContextUtil;
+import com.ran.aicode.websocket.AppEditHandler;
 import lombok.extern.slf4j.Slf4j;
 import org.bsc.langgraph4j.action.AsyncNodeAction;
 import org.bsc.langgraph4j.prebuilt.MessagesState;
@@ -40,6 +41,15 @@ public class ProjectBuilderNode {
                         // 构建成功，返回 dist 目录路径
                         buildResultDir = generatedCodeDir + File.separator + "dist";
                         log.info("Vue 项目构建成功，dist 目录: {}", buildResultDir);
+
+                        // 发送WebSocket通知 - 会员用户构建完成
+                        try {
+                            AppEditHandler appEditHandler = SpringContextUtil.getBean(AppEditHandler.class);
+                            appEditHandler.notifyVueBuildComplete(context.getAppId());
+                            log.info("Vue项目构建完成通知已发送: appId={}", context.getAppId());
+                        } catch (Exception e) {
+                            log.warn("发送Vue构建完成通知失败: appId={}, error={}", context.getAppId(), e.getMessage());
+                        }
                     } else {
                         throw new BusinessException(ErrorCode.SYSTEM_ERROR, "Vue 项目构建失败");
                     }
