@@ -111,6 +111,15 @@ public class AuthServiceImpl implements AuthService {
         }
 
         String email = user.getUserAccount();
+        return verifyCodeByEmail(email, code);
+    }
+
+    @Override
+    public boolean verifyCodeByEmail(String email, String code) {
+        if (StrUtil.isBlank(email) || StrUtil.isBlank(code)) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "邮箱和验证码不能为空");
+        }
+
         String codeKey = VERIFY_CODE_PREFIX + email;
         Object cached = redisTemplate.opsForValue().get(codeKey);
 

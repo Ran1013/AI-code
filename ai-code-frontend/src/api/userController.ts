@@ -79,8 +79,8 @@ export async function listUserVoByPage(
   })
 }
 
-/** 用户登录（需要账号和验证码） POST /user/login */
-export async function userLogin(body: { userAccount: string; verifyCode: string }, options?: { [key: string]: any }) {
+/** 用户登录（支持验证码或密码登录） POST /user/login */
+export async function userLogin(body: { userAccount: string; verifyCode?: string; userPassword?: string }, options?: { [key: string]: any }) {
   return request<API.BaseResponseLoginUserVO>('/user/login', {
     method: 'POST',
     headers: {
@@ -99,20 +99,20 @@ export async function userLogout(options?: { [key: string]: any }) {
   })
 }
 
-// /** 用户注册（当前登录已改为"存在即登，不存在自动创建后登录"，该接口暂不开放） POST /user/register */
-// export async function userRegister(
-//   body: API.UserRegisterRequest,
-//   options?: { [key: string]: any }
-// ) {
-//   return request<API.BaseResponseLong>('/user/register', {
-//     method: 'POST',
-//     headers: {
-//       'Content-Type': 'application/json',
-//     },
-//     data: body,
-//     ...(options || {}),
-//   })
-// }
+/** 用户注册 POST /user/register */
+export async function userRegister(
+  body: API.UserRegisterRequest,
+  options?: { [key: string]: any }
+) {
+  return request<API.BaseResponseLong>('/user/register', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    data: body,
+    ...(options || {}),
+  })
+}
 
 /** 此处后端没有提供注释 POST /user/update */
 export async function updateUser(body: API.UserUpdateRequest, options?: { [key: string]: any }) {
@@ -159,6 +159,23 @@ export async function sendVerifyCode(
 export async function getUserTokenInfo(options?: { [key: string]: any }) {
   return request<API.BaseResponseUser>('/user/token/info', {
     method: 'GET',
+    ...(options || {}),
+  })
+}
+
+/** 修改密码 POST /user/updatePassword */
+export async function updatePassword(body: {
+  email: string
+  verifyCode: string
+  newPassword: string
+  checkPassword: string
+}, options?: { [key: string]: any }) {
+  return request<API.BaseResponseBoolean>('/user/updatePassword', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    data: body,
     ...(options || {}),
   })
 }

@@ -66,9 +66,9 @@
           
           <div class="action-section">
             <a-space>
-              <a-button 
-                v-if="!isEditing" 
-                type="primary" 
+              <a-button
+                v-if="!isEditing"
+                type="primary"
                 @click="startEdit"
               >
                 <template #icon>
@@ -76,9 +76,9 @@
                 </template>
                 编辑信息
               </a-button>
-              <a-button 
-                v-if="isEditing" 
-                type="primary" 
+              <a-button
+                v-if="isEditing"
+                type="primary"
                 @click="saveProfile"
                 :loading="saving"
               >
@@ -87,11 +87,17 @@
                 </template>
                 保存
               </a-button>
-              <a-button 
-                v-if="isEditing" 
+              <a-button
+                v-if="isEditing"
                 @click="cancelEdit"
               >
                 取消
+              </a-button>
+              <a-button type="default" @click="showChangePasswordModal">
+                <template #icon>
+                  <LockOutlined />
+                </template>
+                修改密码
               </a-button>
               <a-button @click="goBack">
                 <template #icon>
@@ -105,19 +111,117 @@
       </div>
     </div>
   </div>
+
+  <!-- 修改密码模态框 -->
+  <a-modal
+    v-model:open="changePasswordVisible"
+    title="修改密码"
+    :footer="null"
+    width="480px"
+  >
+    <a-form
+      :model="passwordForm"
+      name="changePassword"
+      autocomplete="off"
+      @finish="handleChangePassword"
+      layout="vertical"
+    >
+      <a-form-item
+        label="邮箱"
+        name="email"
+        :rules="[
+          { required: true, message: '请输入邮箱' },
+          { type: 'email', message: '请输入正确的邮箱格式' }
+        ]"
+      >
+        <a-input
+          v-model:value="passwordForm.email"
+          placeholder="请输入邮箱"
+          :disabled="true"
+          :value="loginUserStore.loginUser.userAccount"
+        />
+      </a-form-item>
+
+      <a-form-item
+        label="验证码"
+        name="verifyCode"
+        :rules="[
+          { required: true, message: '请输入验证码' },
+          { len: 6, message: '验证码为6位数字' }
+        ]"
+      >
+        <div class="verify-code-container">
+          <a-input
+            v-model:value="passwordForm.verifyCode"
+            placeholder="请输入6位验证码"
+            maxlength="6"
+          />
+          <a-button
+            type="primary"
+            :loading="sendingCode"
+            :disabled="!canSendCode || countdown > 0"
+            @click="handleSendVerifyCode"
+          >
+            {{ countdown > 0 ? `${countdown}s` : '发送验证码' }}
+          </a-button>
+        </div>
+      </a-form-item>
+
+      <a-form-item
+        label="新密码"
+        name="newPassword"
+        :rules="[
+          { required: true, message: '请输入新密码' },
+          { min: 8, message: '密码至少8位' }
+        ]"
+      >
+        <a-input-password
+          v-model:value="passwordForm.newPassword"
+          placeholder="请输入新密码（至少8位）"
+        />
+      </a-form-item>
+
+      <a-form-item
+        label="确认新密码"
+        name="checkPassword"
+        :rules="[
+          { required: true, message: '请确认新密码' },
+          { min: 8, message: '密码至少8位' },
+          { validator: validateConfirmPassword }
+        ]"
+      >
+        <a-input-password
+          v-model:value="passwordForm.checkPassword"
+          placeholder="请再次输入新密码"
+        />
+      </a-form-item>
+
+      <a-form-item>
+        <a-space style="width: 100%; justify-content: flex-end;">
+          <a-button @click="changePasswordVisible = false">
+            取消
+          </a-button>
+          <a-button type="primary" html-type="submit" :loading="changingPassword">
+            确认修改
+          </a-button>
+        </a-space>
+      </a-form-item>
+    </a-form>
+  </a-modal>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, computed, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import { useLoginUserStore } from '../../stores/loginUser'
-import { updateUser } from '../../api/userController'
-import { 
-  EditOutlined, 
-  SaveOutlined, 
+import { updateUser, sendVerifyCode, updatePassword } from '../../api/userController'
+import {
+  EditOutlined,
+  SaveOutlined,
   ArrowLeftOutlined,
-  UserOutlined
+  UserOutlined,
+  LockOutlined
 } from '@ant-design/icons-vue'
 
 const router = useRouter()
@@ -127,9 +231,29 @@ const loginUserStore = useLoginUserStore()
 const isEditing = ref(false)
 const saving = ref(false)
 
+// 修改密码相关
+const changePasswordVisible = ref(false)
+const changingPassword = ref(false)
+const sendingCode = ref(false)
+const countdown = ref(0)
+let countdownTimer: NodeJS.Timeout | null = null
+
 // 表单数据
 const formData = reactive({
   userName: ''
+})
+
+// 修改密码表单数据
+const passwordForm = reactive({
+  email: '',
+  verifyCode: '',
+  newPassword: '',
+  checkPassword: ''
+})
+
+// 计算是否可以发送验证码
+const canSendCode = computed(() => {
+  return passwordForm.email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(passwordForm.email)
 })
 
 // 初始化表单数据
@@ -186,6 +310,84 @@ const goBack = () => {
   router.back()
 }
 
+// 显示修改密码模态框
+const showChangePasswordModal = () => {
+  passwordForm.email = loginUserStore.loginUser.userAccount || ''
+  passwordForm.verifyCode = ''
+  passwordForm.newPassword = ''
+  passwordForm.checkPassword = ''
+  changePasswordVisible.value = true
+}
+
+// 校验确认密码
+const validateConfirmPassword = async (_rule: any, value: string) => {
+  if (value !== passwordForm.newPassword) {
+    return Promise.reject(new Error('两次输入的密码不一致'))
+  }
+  return Promise.resolve()
+}
+
+// 发送验证码
+const handleSendVerifyCode = async () => {
+  if (!canSendCode.value || countdown.value > 0) return
+
+  sendingCode.value = true
+  try {
+    const res = await sendVerifyCode({
+      email: passwordForm.email,
+    })
+
+    if (res.data.code === 0) {
+      message.success('验证码已发送到您的邮箱')
+      startCountdown()
+    } else {
+      message.error('发送验证码失败：' + res.data.message)
+    }
+  } catch (error) {
+    message.error('发送验证码失败，请重试')
+  } finally {
+    sendingCode.value = false
+  }
+}
+
+// 开始倒计时
+const startCountdown = () => {
+  countdown.value = 60
+  countdownTimer = setInterval(() => {
+    countdown.value--
+    if (countdown.value <= 0) {
+      if (countdownTimer) {
+        clearInterval(countdownTimer)
+        countdownTimer = null
+      }
+    }
+  }, 1000)
+}
+
+// 处理修改密码
+const handleChangePassword = async (values: any) => {
+  changingPassword.value = true
+  try {
+    const res = await updatePassword({
+      email: values.email,
+      verifyCode: values.verifyCode,
+      newPassword: values.newPassword,
+      checkPassword: values.checkPassword
+    })
+
+    if (res.data.code === 0) {
+      message.success('密码修改成功')
+      changePasswordVisible.value = false
+    } else {
+      message.error('密码修改失败：' + res.data.message)
+    }
+  } catch (error) {
+    message.error('密码修改失败，请重试')
+  } finally {
+    changingPassword.value = false
+  }
+}
+
 // 格式化用户角色
 const formatUserRole = (role?: string) => {
   switch (role) {
@@ -223,6 +425,13 @@ const formatDate = (date?: string) => {
 // 组件挂载时初始化
 onMounted(() => {
   initFormData()
+})
+
+// 组件卸载时清理定时器
+onUnmounted(() => {
+  if (countdownTimer) {
+    clearInterval(countdownTimer)
+  }
 })
 </script>
 
@@ -455,5 +664,21 @@ onMounted(() => {
 
 .profile-card :deep(.ant-card-body)::-webkit-scrollbar-thumb:hover {
   background: rgba(24, 144, 255, 0.5);
+}
+
+/* 验证码容器样式 */
+.verify-code-container {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.verify-code-container .ant-input {
+  flex: 1;
+}
+
+.verify-code-container .ant-btn {
+  min-width: 100px;
+  white-space: nowrap;
 }
 </style>

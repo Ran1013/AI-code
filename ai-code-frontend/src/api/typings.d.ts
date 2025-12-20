@@ -396,6 +396,7 @@ declare namespace API {
     userAccount?: string
     userPassword?: string
     checkPassword?: string
+    verifyCode?: string
   }
 
   type UserUpdateRequest = {

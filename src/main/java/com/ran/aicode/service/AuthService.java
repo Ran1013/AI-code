@@ -22,6 +22,15 @@ public interface AuthService {
      * @return true 校验通过
      */
     boolean verifyCode(Long userId, String code);
+
+    /**
+     * 通过邮箱校验验证码（用于注册等场景）
+     *
+     * @param email 邮箱地址
+     * @param code  验证码
+     * @return true 校验通过
+     */
+    boolean verifyCodeByEmail(String email, String code);
 }
 
 

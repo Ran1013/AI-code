@@ -48,21 +48,22 @@ public class UserController {
 
     @Resource
     private TokenService tokenService;
-//    /**
-//     * 用户注册（当前登录已改为“存在即登，不存在自动创建后登录”，该接口暂不开放）
-//     *
-//     * @param userRegisterRequest 用户注册请求
-//     * @return 注册结果
-//     */
-//    @PostMapping("/register")
-//    public BaseResponse<Long> userRegister(@RequestBody UserRegisterRequest userRegisterRequest) {
-//        ThrowUtils.throwIf(userRegisterRequest == null, ErrorCode.PARAMS_ERROR);
-//        String userAccount = userRegisterRequest.getUserAccount();
-//        String userPassword = userRegisterRequest.getUserPassword();
-//        String checkPassword = userRegisterRequest.getCheckPassword();
-//        long result = userService.userRegister(userAccount, userPassword, checkPassword);
-//        return ResultUtils.success(result);
-//    }
+  /**
+     * 用户注册
+     *
+     * @param userRegisterRequest 用户注册请求
+     * @return 注册结果
+     */
+    @PostMapping("/register")
+    public BaseResponse<Long> userRegister(@RequestBody UserRegisterRequest userRegisterRequest) {
+        ThrowUtils.throwIf(userRegisterRequest == null, ErrorCode.PARAMS_ERROR);
+        String userAccount = userRegisterRequest.getUserAccount();
+        String userPassword = userRegisterRequest.getUserPassword();
+        String checkPassword = userRegisterRequest.getCheckPassword();
+        String verifyCode = userRegisterRequest.getVerifyCode();
+        long result = userService.userRegister(userAccount, userPassword, checkPassword, verifyCode);
+        return ResultUtils.success(result);
+    }
     /**
      * 发送验证码
      */
@@ -95,6 +96,24 @@ public class UserController {
     public BaseResponse<Boolean> userLogout(HttpServletRequest request) {
         ThrowUtils.throwIf(request == null, ErrorCode.PARAMS_ERROR);
         boolean result = userService.userLogout(request);
+        return ResultUtils.success(result);
+    }
+
+    /**
+     * 修改密码
+     *
+     * @param updatePasswordRequest 修改密码请求
+     * @return 是否修改成功
+     */
+    @PostMapping("/updatePassword")
+    public BaseResponse<Boolean> updatePassword(@RequestBody UpdatePasswordRequest updatePasswordRequest) {
+        ThrowUtils.throwIf(updatePasswordRequest == null, ErrorCode.PARAMS_ERROR);
+        String email = updatePasswordRequest.getEmail();
+        String verifyCode = updatePasswordRequest.getVerifyCode();
+        String newPassword = updatePasswordRequest.getNewPassword();
+        String checkPassword = updatePasswordRequest.getCheckPassword();
+
+        boolean result = userService.updatePassword(email, verifyCode, newPassword, checkPassword);
         return ResultUtils.success(result);
     }
 

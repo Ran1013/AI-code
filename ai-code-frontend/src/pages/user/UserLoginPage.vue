@@ -6,85 +6,151 @@
           <span class="logo-text">AI Code</span>
         </div>
         <h1 class="login-title">用户登录</h1>
-        <p class="login-subtitle">输入邮箱和验证码即可登录</p>
+        <p class="login-subtitle">选择您的登录方式</p>
       </div>
-      
-      <a-form 
-        :model="formState" 
-        name="login" 
-        autocomplete="off" 
-        @finish="handleSubmit"
-        class="login-form"
-      >
-        <a-form-item 
-          name="userAccount" 
-          :rules="[
-            { required: true, message: '请输入邮箱' },
-            { type: 'email', message: '请输入正确的邮箱格式' }
-          ]"
-          class="form-item"
-        >
-          <a-input 
-            v-model:value="formState.userAccount" 
-            placeholder="请输入邮箱"
-            size="large"
-            class="form-input"
-          >
-            <template #prefix>
-              <span class="input-icon">📧</span>
-            </template>
-          </a-input>
-        </a-form-item>
 
-        <a-form-item 
-          name="verifyCode" 
-          :rules="[
-            { required: true, message: '请输入验证码' },
-            { len: 6, message: '验证码为6位数字' }
-          ]"
-          class="form-item"
-        >
-          <div class="verify-code-container">
-            <a-input 
-              v-model:value="formState.verifyCode" 
-              placeholder="请输入6位验证码"
-              size="large"
-              class="verify-code-input"
-              maxlength="6"
-            >
-              <template #prefix>
-                <span class="input-icon">🔐</span>
-              </template>
-            </a-input>
-            <a-button 
-              type="primary" 
-              size="large"
-              class="send-code-btn"
-              :loading="sendingCode"
-              :disabled="!canSendCode || countdown > 0"
-              @click="handleSendVerifyCode"
-            >
-              {{ countdown > 0 ? `${countdown}s` : '发送验证码' }}
-            </a-button>
-          </div>
-        </a-form-item>
-        
-        <a-form-item class="form-item">
-          <a-button 
-            type="primary" 
-            html-type="submit" 
-            size="large"
-            class="login-btn"
-            :loading="loading"
+      <a-tabs v-model:activeKey="loginType" class="login-tabs" centered>
+        <a-tab-pane key="verify" tab="验证码登录">
+          <a-form
+            :model="verifyFormState"
+            name="verifyLogin"
+            autocomplete="off"
+            @finish="handleVerifyLogin"
+            class="login-form"
           >
-            登录
-          </a-button>
-        </a-form-item>
-      </a-form>
-      
+            <a-form-item
+              name="userAccount"
+              :rules="[
+                { required: true, message: '请输入邮箱' },
+                { type: 'email', message: '请输入正确的邮箱格式' }
+              ]"
+              class="form-item"
+            >
+              <a-input
+                v-model:value="verifyFormState.userAccount"
+                placeholder="请输入邮箱"
+                size="large"
+                class="form-input"
+              >
+                <template #prefix>
+                  <span class="input-icon">📧</span>
+                </template>
+              </a-input>
+            </a-form-item>
+
+            <a-form-item
+              name="verifyCode"
+              :rules="[
+                { required: true, message: '请输入验证码' },
+                { len: 6, message: '验证码为6位数字' }
+              ]"
+              class="form-item"
+            >
+              <div class="verify-code-container">
+                <a-input
+                  v-model:value="verifyFormState.verifyCode"
+                  placeholder="请输入6位验证码"
+                  size="large"
+                  class="verify-code-input"
+                  maxlength="6"
+                >
+                  <template #prefix>
+                    <span class="input-icon">🔐</span>
+                  </template>
+                </a-input>
+                <a-button
+                  type="primary"
+                  size="large"
+                  class="send-code-btn"
+                  :loading="sendingCode"
+                  :disabled="!canSendCode || countdown > 0"
+                  @click="handleSendVerifyCode"
+                >
+                  {{ countdown > 0 ? `${countdown}s` : '发送验证码' }}
+                </a-button>
+              </div>
+            </a-form-item>
+
+            <a-form-item class="form-item">
+              <a-button
+                type="primary"
+                html-type="submit"
+                size="large"
+                class="login-btn"
+                :loading="loading"
+              >
+                登录
+              </a-button>
+            </a-form-item>
+          </a-form>
+        </a-tab-pane>
+
+        <a-tab-pane key="password" tab="密码登录">
+          <a-form
+            :model="passwordFormState"
+            name="passwordLogin"
+            autocomplete="off"
+            @finish="handlePasswordLogin"
+            class="login-form"
+          >
+            <a-form-item
+              name="userAccount"
+              :rules="[
+                { required: true, message: '请输入邮箱' },
+                { type: 'email', message: '请输入正确的邮箱格式' }
+              ]"
+              class="form-item"
+            >
+              <a-input
+                v-model:value="passwordFormState.userAccount"
+                placeholder="请输入邮箱"
+                size="large"
+                class="form-input"
+              >
+                <template #prefix>
+                  <span class="input-icon">📧</span>
+                </template>
+              </a-input>
+            </a-form-item>
+
+            <a-form-item
+              name="userPassword"
+              :rules="[
+                { required: true, message: '请输入密码' }
+              ]"
+              class="form-item"
+            >
+              <a-input-password
+                v-model:value="passwordFormState.userPassword"
+                placeholder="请输入密码"
+                size="large"
+                class="form-input"
+              >
+                <template #prefix>
+                  <span class="input-icon">🔒</span>
+                </template>
+              </a-input-password>
+            </a-form-item>
+
+            <a-form-item class="form-item">
+              <a-button
+                type="primary"
+                html-type="submit"
+                size="large"
+                class="login-btn"
+                :loading="loading"
+              >
+                登录
+              </a-button>
+            </a-form-item>
+          </a-form>
+        </a-tab-pane>
+      </a-tabs>
+
       <div class="login-footer">
         <p class="login-tip">
-          首次登录将自动创建账户
+          还没有账号？
+          <router-link to="/user/register" class="register-link">立即注册</router-link>
         </p>
       </div>
     </div>
@@ -98,9 +164,18 @@ import { useLoginUserStore } from '@/stores/loginUser.ts'
 import { useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 
-const formState = reactive({
+const loginType = ref('verify')
+
+// 验证码登录表单
+const verifyFormState = reactive({
   userAccount: '',
   verifyCode: '',
+})
+
+// 密码登录表单
+const passwordFormState = reactive({
+  userAccount: '',
+  userPassword: '',
 })
 
 const router = useRouter()
@@ -110,23 +185,25 @@ const sendingCode = ref(false)
 const countdown = ref(0)
 let countdownTimer: NodeJS.Timeout | null = null
 
-// 计算是否可以发送验证码
+// 计算是否可以发送验证码（从当前激活的表单获取邮箱）
 const canSendCode = computed(() => {
-  return formState.userAccount && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formState.userAccount)
+  const email = loginType.value === 'verify' ? verifyFormState.userAccount : passwordFormState.userAccount
+  return email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
 })
 
 /**
  * 发送验证码
  */
 const handleSendVerifyCode = async () => {
+  const email = loginType.value === 'verify' ? verifyFormState.userAccount : passwordFormState.userAccount
   if (!canSendCode.value || countdown.value > 0) return
-  
+
   sendingCode.value = true
   try {
     const res = await sendVerifyCode({
-      email: formState.userAccount,
+      email: email,
     })
-    
+
     if (res.data.code === 0) {
       message.success('验证码已发送到您的邮箱')
       startCountdown()
@@ -157,19 +234,46 @@ const startCountdown = () => {
 }
 
 /**
- * 提交表单
+ * 验证码登录
  * @param values
  */
-const handleSubmit = async (values: any) => {
+const handleVerifyLogin = async (values: any) => {
   loading.value = true
   try {
-    // 登录时需要验证码
-    const res = await userLogin({ 
+    const res = await userLogin({
       userAccount: values.userAccount,
       verifyCode: values.verifyCode
-    } as API.UserLoginRequest)
-    
-    // 登录成功，把登录态保存到全局状态中
+    })
+
+    if (res.data.code === 0 && res.data.data) {
+      await loginUserStore.fetchLoginUser()
+      message.success('登录成功')
+      router.push({
+        path: '/',
+        replace: true,
+      })
+    } else {
+      message.error('登录失败，' + res.data.message)
+    }
+  } catch (error) {
+    message.error('登录失败，请重试')
+  } finally {
+    loading.value = false
+  }
+}
+
+/**
+ * 密码登录
+ * @param values
+ */
+const handlePasswordLogin = async (values: any) => {
+  loading.value = true
+  try {
+    const res = await userLogin({
+      userAccount: values.userAccount,
+      userPassword: values.userPassword
+    })
+
     if (res.data.code === 0 && res.data.data) {
       await loginUserStore.fetchLoginUser()
       message.success('登录成功')
@@ -364,6 +468,42 @@ onUnmounted(() => {
   color: #666;
   font-size: 14px;
   margin: 0;
+}
+
+.register-link {
+  color: #1890ff;
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.register-link:hover {
+  color: #40a9ff;
+  text-decoration: underline;
+}
+
+/* Tabs样式 */
+.login-tabs {
+  margin-bottom: 24px;
+}
+
+.login-tabs :deep(.ant-tabs-bar) {
+  border-bottom: 1px solid #e8e8e8;
+  margin-bottom: 24px;
+}
+
+.login-tabs :deep(.ant-tabs-tab) {
+  font-size: 16px;
+  font-weight: 500;
+  padding: 12px 24px;
+}
+
+.login-tabs :deep(.ant-tabs-tab-active) {
+  color: #1890ff;
+  font-weight: 600;
+}
+
+.login-tabs :deep(.ant-tabs-ink-bar) {
+  background: #1890ff;
 }
 
 /* 响应式设计 */
