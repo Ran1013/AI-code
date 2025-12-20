@@ -101,7 +101,7 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
             throw new BusinessException(ErrorCode.NO_AUTH_ERROR, "无权限访问该应用");
         }
         
-        // 4. 软拦截：管理员/会员跳过，普通用户进行余额估算校验
+        // 4. 软拦截：管理员/测试跳过，普通用户进行余额估算校验
         if (!tokenService.isAdminUser(loginUser.getId())) {
             long estimatedTokens = estimateRequiredTokens(message, app.getCodeGenType());
             long remaining = tokenService.getRemainingTokens(loginUser.getId());
@@ -128,7 +128,7 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         Flux<String> codeStream;
         String userRole = loginUser.getUserRole();
         if (UserRoleEnum.MEMBER.getValue().equals(userRole) || UserRoleEnum.ADMIN.getValue().equals(userRole)) {
-            // 会员和管理员：走工作流（无限制）
+            // 测试和管理员：走工作流（无限制）
             codeStream = new CodeGenConcurrentWorkflow().executeWorkflowWithFlux(fullMessage, appId, loginUser.getId());
         } else if (codeGenTypeEnum == CodeGenTypeEnum.VUE_PROJECT) {
             // 普通用户 + Vue：预占

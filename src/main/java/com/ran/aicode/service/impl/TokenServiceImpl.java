@@ -49,9 +49,9 @@ public class TokenServiceImpl implements TokenService {
             return false;
         }
 
-        // 管理员和会员都不消耗token
+        // 管理员和测试用户都不消耗token
         if (isAdminUser(userId) || isMemberUser(userId)) {
-            log.info("管理员或会员用户 {} 不消耗token", userId);
+            log.info("管理员或测试用户 {} 不消耗token", userId);
             return true;
         }
 
@@ -152,7 +152,7 @@ public class TokenServiceImpl implements TokenService {
         if (userId == null || estimatedTokens <= 0) {
             return false;
         }
-        // 管理员或会员不需要预占
+        // 管理员或测试用户不需要预占
         if (isAdminUser(userId)) {
             return true;
         }
@@ -177,7 +177,7 @@ public class TokenServiceImpl implements TokenService {
         if (userId == null || tokens <= 0) {
             return;
         }
-        // 管理员或会员无操作
+        // 管理员或测试用户无操作
         if (isAdminUser(userId)) {
             return;
         }
@@ -199,7 +199,7 @@ public class TokenServiceImpl implements TokenService {
         if (userId == null || actualTokens < 0) {
             return;
         }
-        // 管理员或会员无操作
+        // 管理员或测试用户无操作
         if (isAdminUser(userId)) {
             return;
         }

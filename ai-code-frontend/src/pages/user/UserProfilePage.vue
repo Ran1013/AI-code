@@ -192,7 +192,7 @@ const formatUserRole = (role?: string) => {
     case 'admin':
       return '管理员'
     case 'member':
-      return '会员'
+      return '测试'
     case 'user':
       return '普通用户'
     default:

@@ -31,7 +31,7 @@
               管理员
             </a-tag>
             <a-tag v-else-if="tokenInfoStore.tokenInfo && tokenInfoStore.tokenInfo.userRole === 'member'" color="orange">
-              会员
+              测试
             </a-tag>
             <a-tag v-else-if="tokenInfoStore.tokenInfo" :color="getTokenTagColor(tokenInfoStore.tokenInfo)">
               使用量: {{ tokenInfoStore.tokenInfo.usedTokens }}/{{ tokenInfoStore.tokenInfo.totalTokens }}
