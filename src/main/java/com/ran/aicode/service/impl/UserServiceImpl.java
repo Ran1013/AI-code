@@ -94,6 +94,8 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         user.setUserPassword(encryptPassword);
         user.setUserName(userAccount);
         user.setUserRole(UserRoleEnum.USER.getValue());
+        user.setTotalTokens(150000L); // 新用户默认150000 token
+        user.setUsedTokens(0L);
         boolean saveResult = this.save(user);
         if (!saveResult) {
             throw new BusinessException(ErrorCode.SYSTEM_ERROR, "注册失败，数据库错误");
@@ -164,6 +166,8 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
                 // 密码字段非空，写入随机占位密码（不可用于登录）
                 String placeholder = RandomUtil.randomString(16);
                 user.setUserPassword(getEncryptPassword(placeholder));
+                user.setTotalTokens(150000L); // 新用户默认150000 token
+                user.setUsedTokens(0L);
                 boolean created = this.save(user);
                 if (!created) {
                     throw new BusinessException(ErrorCode.SYSTEM_ERROR, "自动创建用户失败");

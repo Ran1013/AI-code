@@ -99,8 +99,8 @@ public class TokenServiceImpl implements TokenService {
         if (user != null) {
             // 如果数据库中没有这些字段，设置默认值（这种情况应该很少见）
             if (user.getTotalTokens() == null) {
-                log.warn("用户 {} 的totalTokens字段为null，设置默认值50000", userId);
-                user.setTotalTokens(50000L); // 设置默认值
+                log.warn("用户 {} 的totalTokens字段为null，设置默认值150000", userId);
+                user.setTotalTokens(150000L); // 设置默认值
             }
             if (user.getUsedTokens() == null) {
                 log.warn("用户 {} 的usedTokens字段为null，设置默认值0", userId);
