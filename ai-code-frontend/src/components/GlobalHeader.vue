@@ -2,7 +2,7 @@
   <a-layout-header class="header">
     <a-row :wrap="false" align="middle" class="header-content">
       <!-- 左侧：Logo和标题 -->
-      <a-col flex="200px">
+      <a-col :style="{ width: '220px', flexShrink: 0 }">
         <RouterLink to="/" class="logo-link">
           <div class="header-left">
             <div class="logo-container">
@@ -13,7 +13,7 @@
         </RouterLink>
       </a-col>
       <!-- 中间：导航菜单 -->
-      <a-col flex="auto">
+      <a-col flex="1" style="min-width: 0;">
         <a-menu
           v-model:selectedKeys="selectedKeys"
           mode="horizontal"
@@ -23,7 +23,7 @@
         />
       </a-col>
       <!-- 右侧：用户操作区域 -->
-      <a-col flex="200px" style="text-align: right;">
+      <a-col :style="{ width: '300px', flexShrink: 0, textAlign: 'right' }">
         <div class="user-login-status">
           <div v-if="loginUserStore.loginUser.id" class="user-status-container">
             <!-- 用户状态徽章（独立显示，不参与下拉菜单） -->
@@ -39,12 +39,12 @@
             <a-tag v-else color="default">
               加载中...
             </a-tag>
-            
+
             <!-- 用户头像和用户名（可点击下拉菜单） -->
             <a-dropdown>
               <a-space class="user-info">
                 <a-avatar :src="loginUserStore.loginUser.userAvatar" class="user-avatar" />
-                <span class="username">{{ loginUserStore.loginUser.userName ?? '无名' }}</span>
+                <span class="username">{{ loginUserStore.loginUser.userName ?? loginUserStore.loginUser.userAccount ?? '无名' }}</span>
               </a-space>
               <template #overlay>
                 <a-menu class="user-dropdown">
@@ -293,8 +293,9 @@ const doLogout = async () => {
 .user-status-container {
   display: flex;
   align-items: center;
-  gap: 8px; /* 减少间距，让普通用户token标识更靠近头像 */
-  margin-left: -40px; /* 整个用户状态容器向左移动更多 */
+  gap: 12px;
+  justify-content: flex-end; /* 右对齐，确保内容不会溢出 */
+  flex-wrap: nowrap; /* 防止换行 */
 }
 
 /* 确保所有用户状态标签垂直对齐 */
@@ -305,22 +306,19 @@ const doLogout = async () => {
   line-height: 1;
   white-space: nowrap; /* 防止文本换行 */
   min-height: 24px; /* 确保最小高度一致 */
-}
-
-/* 普通用户token标识向左偏移，与其他徽章对齐 */
-.user-status-container .ant-tag[color="blue"] {
-  margin-left: 0px; /* 回退到无偏移 */
+  flex-shrink: 0; /* 防止标签被压缩 */
 }
 
 .user-info {
   cursor: pointer;
-  padding: 8px 12px;
+  padding: 8px 16px;
   border-radius: 8px;
   transition: all 0.3s ease;
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-left: 0px; /* 回退到无偏移 */
+  flex-shrink: 0; /* 防止用户信息被压缩 */
+  white-space: nowrap; /* 防止用户名换行 */
 }
 
 .user-info:hover {
@@ -334,6 +332,7 @@ const doLogout = async () => {
 .username {
   font-weight: 500;
   color: #333;
+  font-size: 14px;
 }
 
 .token-info {
@@ -394,6 +393,27 @@ const doLogout = async () => {
     height: 28px;
   }
 
+  .user-status-container {
+    gap: 8px; /* 移动端减少间距 */
+  }
+
+  .user-status-container .ant-tag {
+    font-size: 12px; /* 移动端减小字体 */
+    min-height: 20px;
+    padding: 2px 6px;
+  }
+
+  .user-info {
+    padding: 6px 10px; /* 移动端减少内边距 */
+  }
+
+  .username {
+    font-size: 13px; /* 移动端减小字体 */
+    max-width: 80px; /* 仅在移动端限制宽度并截断 */
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
 
   .nav-menu {
     display: none;
