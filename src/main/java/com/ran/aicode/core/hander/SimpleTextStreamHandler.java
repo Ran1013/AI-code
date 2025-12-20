@@ -4,6 +4,7 @@ import com.ran.aicode.model.entity.User;
 import com.ran.aicode.model.enums.ChatHistoryMessageTypeEnum;
 import com.ran.aicode.model.enums.ChatHistoryStatusEnum;
 import com.ran.aicode.service.ChatHistoryService;
+import com.ran.aicode.core.util.ErrorMessageUtils;
 import lombok.extern.slf4j.Slf4j;
 import reactor.core.publisher.Flux;
 
@@ -41,9 +42,15 @@ public class SimpleTextStreamHandler {
                     log.info("流正常完成，保存完整AI响应到数据库: appId={}, userId={}, contentLength={}", appId, loginUser.getId(), aiResponse.length());
                 })
                 .doOnError(error -> {
-                    String errorMessage = "AI回复失败: " + error.getMessage();
-                    log.error("AI回复失败，保存错误信息到数据库: appId={}, userId={}, error={}", appId, loginUser.getId(), error.getMessage());
-                    chatHistoryService.addChatMessage(appId, errorMessage, ChatHistoryMessageTypeEnum.AI.getValue(), loginUser.getId(),ChatHistoryStatusEnum.AI_INTERRUPTED.getValue(),null);
+                    // 使用ErrorMessageUtils简化错误信息，隐藏技术细节
+                    String detailedError = error.getMessage();
+                    String userFriendlyMessage = ErrorMessageUtils.sanitize(detailedError);
+                    
+                    // 记录详细错误到日志
+                    log.error("AI回复失败，保存错误信息到数据库: appId={}, userId={}, error={}", appId, loginUser.getId(), detailedError);
+                    
+                    // 保存用户友好的错误信息到聊天历史
+                    chatHistoryService.addChatMessage(appId, userFriendlyMessage, ChatHistoryMessageTypeEnum.AI.getValue(), loginUser.getId(),ChatHistoryStatusEnum.AI_INTERRUPTED.getValue(),null);
                 });
     }
 }

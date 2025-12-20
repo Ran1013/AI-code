@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Token API Test</title>
+</head>
+<body>
+    <h1>Token API Test</h1>
+    <button onclick="testTokenAPI()">Test Token API</button>
+    <div id="result"></div>
+
+    <script>
+        async function testTokenAPI() {
+            try {
+                console.log('Testing Token API...');
+                
+                // 测试获取用户登录信息
+                const loginResponse = await fetch('/api/user/get/login', {
+                    method: 'GET',
+                    credentials: 'include'
+                });
+                console.log('Login response:', loginResponse);
+                const loginData = await loginResponse.json();
+                console.log('Login data:', loginData);
+                
+                // 测试获取token信息
+                const tokenResponse = await fetch('/api/user/token/info', {
+                    method: 'GET',
+                    credentials: 'include'
+                });
+                console.log('Token response:', tokenResponse);
+                const tokenData = await tokenResponse.json();
+                console.log('Token data:', tokenData);
+                
+                document.getElementById('result').innerHTML = `
+                    <h2>Login Response:</h2>
+                    <pre>${JSON.stringify(loginData, null, 2)}</pre>
+                    <h2>Token Response:</h2>
+                    <pre>${JSON.stringify(tokenData, null, 2)}</pre>
+                `;
+            } catch (error) {
+                console.error('Error:', error);
+                document.getElementById('result').innerHTML = `<p>Error: ${error.message}</p>`;
+            }
+        }
+    </script>
+</body>
+</html>

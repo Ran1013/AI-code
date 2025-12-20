@@ -248,4 +248,15 @@ public class AppEditHandler extends TextWebSocketHandler {
 
         broadcastToSessions(appId, textMessage, excludeSession);
     }
+
+    /**
+     * 通知Vue项目构建完成
+     *
+     * @param appId
+     */
+    public void notifyVueBuildComplete(Long appId) throws IOException {
+        AppResponseMessage appResponseMessage = new AppResponseMessage();
+        appResponseMessage.setMessageType(AppMessageTypeEnum.VUE_BUILD_COMPLETE.getValue());
+        broadcastToApp(appId, appResponseMessage);
+    }
 }

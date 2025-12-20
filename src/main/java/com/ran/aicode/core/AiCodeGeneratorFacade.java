@@ -14,6 +14,7 @@ import com.ran.aicode.core.saver.CodeFileSaverExecutor;
 import com.ran.aicode.exception.BusinessException;
 import com.ran.aicode.exception.ErrorCode;
 import com.ran.aicode.model.enums.CodeGenTypeEnum;
+import com.ran.aicode.service.TokenService;
 import dev.langchain4j.model.chat.response.ChatResponse;
 import dev.langchain4j.service.TokenStream;
 import dev.langchain4j.service.tool.ToolExecution;
@@ -41,6 +42,9 @@ public class AiCodeGeneratorFacade {
 
     @Resource
     private VueProjectBuilder vueProjectBuilder;
+
+    @Resource
+    private TokenService tokenService;
 //
 //    /**
 //     * 统一入口：根据类型生成并保存代码
@@ -95,22 +99,38 @@ public class AiCodeGeneratorFacade {
         AiCodeGeneratorService aiCodeGeneratorService = aiCodeGeneratorServiceFactory.getAiCodeGeneratorService(appId, codeGenTypeEnum);
         return switch (codeGenTypeEnum) {
             case HTML -> {
-                Flux<String> codeStream = aiCodeGeneratorService.generateHtmlCodeStream(userMessage);
-                yield processCodeStream(codeStream, CodeGenTypeEnum.HTML, appId, userId);
+                yield generateHtmlWithRetryStream(aiCodeGeneratorService, userMessage, appId, userId);
             }
             case MULTI_FILE -> {
-                Flux<String> codeStream = aiCodeGeneratorService.generateMultiFileCodeStream(userMessage);
-                yield processCodeStream(codeStream, CodeGenTypeEnum.MULTI_FILE, appId, userId);
+                TokenStream tokenStream = aiCodeGeneratorService.generateMultiFileCodeStream(appId, userMessage);
+                yield processTokenStreamForSimpleText(tokenStream, appId, userId, CodeGenTypeEnum.MULTI_FILE);
             }
             case VUE_PROJECT -> {
                 TokenStream tokenStream = aiCodeGeneratorService.generateVueProjectCodeStream(appId, userMessage);
-                yield processTokenStream(tokenStream, appId, userId);
+                yield processTokenStream(tokenStream, appId, userId, CodeGenTypeEnum.VUE_PROJECT);
             }
             default -> {
                 String errorMessage = "不支持的生成类型：" + codeGenTypeEnum.getValue();
                 throw new BusinessException(ErrorCode.SYSTEM_ERROR, errorMessage);
             }
         };
+    }
+
+    /**
+     * 统一入口（含预占上下文）：仅 Vue 模式使用，用于根据实际消耗多退少补。
+     */
+    public Flux<String> generateAndSaveCodeStreamWithReservation(String userMessage, CodeGenTypeEnum codeGenTypeEnum,
+                                                                 Long appId, Long userId,
+                                                                 String reservationId, long estimatedTokens) {
+        if (codeGenTypeEnum != CodeGenTypeEnum.VUE_PROJECT) {
+            return generateAndSaveCodeStream(userMessage, codeGenTypeEnum, appId, userId);
+        }
+        if (generationTaskManager.hasActiveTask(appId)) {
+            throw new BusinessException(ErrorCode.SYSTEM_ERROR, "该应用已有正在进行的生成任务，请等待完成或取消后再试");
+        }
+        AiCodeGeneratorService aiCodeGeneratorService = aiCodeGeneratorServiceFactory.getAiCodeGeneratorService(appId, codeGenTypeEnum);
+        TokenStream tokenStream = aiCodeGeneratorService.generateVueProjectCodeStream(appId, userMessage);
+        return processTokenStreamWithReservation(tokenStream, appId, userId, codeGenTypeEnum, reservationId, estimatedTokens);
     }
 
     /**
@@ -134,58 +154,188 @@ public class AiCodeGeneratorFacade {
         return generationTaskManager;
     }
 
+
     /**
-     * 通用流式代码处理方法
+     * 将 TokenStream 转换为纯文本流（用于HTML和多文件模式），过滤工具调用信息
      *
-     * @param codeStream  代码流
-     * @param codeGenType 代码生成类型
-     * @param appId 应用 ID
+     * @param tokenStream TokenStream 对象
+     * @param appId 应用ID
      * @param userId 用户ID
-     * @return 流式响应
+     * @param codeGenType 代码生成类型
+     * @return Flux<String> 纯文本流式响应
      */
-    private Flux<String> processCodeStream(Flux<String> codeStream, CodeGenTypeEnum codeGenType, Long appId, Long userId) {
-        // 字符串拼接器，用于当流式返回所有的代码之后，再保存代码
-        StringBuilder codeBuilder = new StringBuilder();
+    private Flux<String> processTokenStreamForSimpleText(TokenStream tokenStream, Long appId, Long userId, CodeGenTypeEnum codeGenType) {
         // 部分内容收集器，用于取消时保存已生成的内容
         StringBuilder partialContentBuilder = new StringBuilder();
-        
+
         return Flux.create((FluxSink<String> sink) -> {
             // 注册任务到管理器
-            Disposable disposable = codeStream
-                    .doOnNext(chunk -> {
-                        // 实时收集代码片段
-                        codeBuilder.append(chunk);
-                        // 同时收集部分内容用于取消时保存
-                        partialContentBuilder.append(chunk);
-                        // 发送到客户端
-                        sink.next(chunk);
+            Disposable disposable = Flux.never().subscribe(); // 占位符，实际取消逻辑在TokenStream中
+
+            generationTaskManager.registerTask(appId, codeGenType.getValue(), disposable, sink, userId, partialContentBuilder);
+
+            tokenStream.onPartialResponse((String partialResponse) -> {
+                        partialContentBuilder.append(partialResponse);
+                        sink.next(partialResponse);
                     })
-                    .doOnComplete(() -> {
-                        // 流式返回完成后，保存代码
-                        try {
-                            String completeCode = codeBuilder.toString();
-                            // 使用执行器解析代码
-                            Object parsedResult = CodeParserExecutor.executeParser(completeCode, codeGenType);
-                            // 使用执行器保存代码
-                            File saveDir = CodeFileSaverExecutor.executeSaver(parsedResult, codeGenType, appId);
-                            log.info("保存成功，目录为：{}", saveDir.getAbsolutePath());
-                        } catch (Exception e) {
-                            log.error("保存失败: {}", e.getMessage());
-                        } finally {
-                            // 完成任务
+                    .onPartialToolExecutionRequest((index, toolExecutionRequest) -> {
+                        log.debug("忽略工具调用请求: {}", toolExecutionRequest.name());
+                    })
+                    .onToolExecuted((ToolExecution toolExecution) -> {
+                        log.debug("忽略工具执行结果: {}", toolExecution.request().name());
+                    })
+                    .onCompleteResponse((ChatResponse response) -> {
+                        if (response == null) {
+                            log.warn("收到空的完整响应，跳过处理");
                             generationTaskManager.completeTask(appId);
                             sink.complete();
+                            return;
                         }
+
+                        // 统计并更新用户token消耗
+                        try {
+                            dev.langchain4j.model.output.TokenUsage tokenUsage = response.metadata().tokenUsage();
+                            if (tokenUsage != null) {
+                                Long inputTokens = tokenUsage.inputTokenCount() != null ? tokenUsage.inputTokenCount() : 0L;
+                                Long outputTokens = tokenUsage.outputTokenCount() != null ? tokenUsage.outputTokenCount() : 0L;
+                                Long consumedTokens = inputTokens + outputTokens;
+                                if (consumedTokens > 0) {
+                                    boolean success = tokenService.consumeTokens(userId, consumedTokens);
+                                    if (success) {
+                                        log.info("用户 {} 消耗token成功，消耗: {}", userId, consumedTokens);
+                                    } else {
+                                        log.warn("用户 {} 消耗token失败，消耗: {}", userId, consumedTokens);
+                                    }
+                                }
+                            }
+                        } catch (Exception e) {
+                            log.error("统计用户token消耗失败: userId={}, error={}", userId, e.getMessage(), e);
+                        }
+
+                        // 保存代码：失败必须透传给前端（让 SSE 走 business-error）
+                        String completeCode = partialContentBuilder.toString();
+                        if (completeCode != null && !completeCode.trim().isEmpty()) {
+                            Object parsedResult = CodeParserExecutor.executeParser(completeCode, codeGenType);
+                            File saveDir = CodeFileSaverExecutor.executeSaver(parsedResult, codeGenType, appId);
+                            log.info("保存成功，目录为：{}", saveDir.getAbsolutePath());
+                        }
+
+                        generationTaskManager.completeTask(appId);
+                        sink.complete();
                     })
-                    .doOnError(error -> {
-                        log.error("代码生成失败: {}", error.getMessage());
+                    .onError((Throwable error) -> {
+                        error.printStackTrace();
                         generationTaskManager.completeTask(appId);
                         sink.error(error);
                     })
-                    .subscribe();
-            
-            // 注册任务，传递部分内容收集器
+                    .start();
+        });
+    }
+
+    private static final String HTML_RETRY_APPEND_PROMPT = "\n\n" +
+            "【严格输出要求】\n" +
+            "1) 只允许输出一个代码块，且必须是 ```html 开头、``` 结尾。\n" +
+            "2) 代码必须包含 <!DOCTYPE html> 或 <html>，并且是完整可运行的单文件页面。\n" +
+            "3) 代码块之外禁止输出任何解释、清单、说明文字。\n";
+
+    /**
+     * HTML 模式：失败自动重试一次。
+     */
+    private Flux<String> generateHtmlWithRetryStream(AiCodeGeneratorService aiCodeGeneratorService, String userMessage, Long appId, Long userId) {
+        TokenStream first = aiCodeGeneratorService.generateHtmlCodeStream(appId, userMessage);
+        return processHtmlTokenStreamWithRetry(first, aiCodeGeneratorService, userMessage, appId, userId, false);
+    }
+
+    private Flux<String> processHtmlTokenStreamWithRetry(TokenStream tokenStream,
+                                                        AiCodeGeneratorService aiCodeGeneratorService,
+                                                        String originalUserMessage,
+                                                        Long appId,
+                                                        Long userId,
+                                                        boolean isRetry) {
+        StringBuilder partialContentBuilder = new StringBuilder();
+        CodeGenTypeEnum codeGenType = CodeGenTypeEnum.HTML;
+
+        return Flux.create((FluxSink<String> sink) -> {
+            Disposable disposable = Flux.never().subscribe();
             generationTaskManager.registerTask(appId, codeGenType.getValue(), disposable, sink, userId, partialContentBuilder);
+
+            tokenStream.onPartialResponse((String partialResponse) -> {
+                        partialContentBuilder.append(partialResponse);
+                        sink.next(partialResponse);
+                    })
+                    .onPartialToolExecutionRequest((index, toolExecutionRequest) -> {
+                        log.debug("忽略工具调用请求: {}", toolExecutionRequest.name());
+                    })
+                    .onToolExecuted((ToolExecution toolExecution) -> {
+                        log.debug("忽略工具执行结果: {}", toolExecution.request().name());
+                    })
+                    .onCompleteResponse((ChatResponse response) -> {
+                        if (response == null) {
+                            log.warn("收到空的完整响应，跳过处理");
+                            generationTaskManager.completeTask(appId);
+                            sink.complete();
+                            return;
+                        }
+
+                        // 统计并更新用户token消耗（保持与原逻辑一致）
+                        try {
+                            dev.langchain4j.model.output.TokenUsage tokenUsage = response.metadata().tokenUsage();
+                            if (tokenUsage != null) {
+                                Long inputTokens = tokenUsage.inputTokenCount() != null ? tokenUsage.inputTokenCount() : 0L;
+                                Long outputTokens = tokenUsage.outputTokenCount() != null ? tokenUsage.outputTokenCount() : 0L;
+                                Long consumedTokens = inputTokens + outputTokens;
+                                if (consumedTokens > 0) {
+                                    boolean success = tokenService.consumeTokens(userId, consumedTokens);
+                                    if (success) {
+                                        log.info("用户 {} 消耗token成功，消耗: {}", userId, consumedTokens);
+                                    } else {
+                                        log.warn("用户 {} 消耗token失败，消耗: {}", userId, consumedTokens);
+                                    }
+                                }
+                            }
+                        } catch (Exception e) {
+                            log.error("统计用户token消耗失败: userId={}, error={}", userId, e.getMessage(), e);
+                        }
+
+                        String completeCode = partialContentBuilder.toString();
+                        if (completeCode != null && !completeCode.trim().isEmpty()) {
+                            try {
+                                Object parsedResult = CodeParserExecutor.executeParser(completeCode, codeGenType);
+                                File saveDir = CodeFileSaverExecutor.executeSaver(parsedResult, codeGenType, appId);
+                                log.info("保存成功，目录为：{}", saveDir.getAbsolutePath());
+
+                                generationTaskManager.completeTask(appId);
+                                sink.complete();
+                                return;
+                            } catch (com.ran.aicode.exception.BusinessException e) {
+                                // HTML 解析/校验失败：自动重试一次
+                                if (!isRetry) {
+                                    log.warn("HTML 解析失败，准备重试一次: appId={}, error={}", appId, e.getMessage());
+                                    generationTaskManager.completeTask(appId);
+
+                                    String retryMessage = originalUserMessage + HTML_RETRY_APPEND_PROMPT;
+                                    TokenStream retryStream = aiCodeGeneratorService.generateHtmlCodeStream(appId, retryMessage);
+
+                                    processHtmlTokenStreamWithRetry(retryStream, aiCodeGeneratorService, originalUserMessage, appId, userId, true)
+                                            .subscribe(sink::next, sink::error, sink::complete);
+                                    return;
+                                }
+                                // 已重试仍失败：抛出异常给上层，让 GlobalExceptionHandler 输出 business-error
+                                generationTaskManager.completeTask(appId);
+                                sink.error(e);
+                                return;
+                            }
+                        }
+
+                        generationTaskManager.completeTask(appId);
+                        sink.complete();
+                    })
+                    .onError((Throwable error) -> {
+                        error.printStackTrace();
+                        generationTaskManager.completeTask(appId);
+                        sink.error(error);
+                    })
+                    .start();
         });
     }
 
@@ -195,9 +345,10 @@ public class AiCodeGeneratorFacade {
      * @param tokenStream TokenStream 对象
      * @param appId 应用ID
      * @param userId 用户ID
+     * @param codeGenType 代码生成类型
      * @return Flux<String> 流式响应
      */
-    private Flux<String> processTokenStream(TokenStream tokenStream, Long appId, Long userId) {
+    private Flux<String> processTokenStream(TokenStream tokenStream, Long appId, Long userId, CodeGenTypeEnum codeGenType) {
         // 部分内容收集器，用于取消时保存已生成的内容
         StringBuilder partialContentBuilder = new StringBuilder();
         
@@ -205,7 +356,7 @@ public class AiCodeGeneratorFacade {
             // 注册任务到管理器
             Disposable disposable = Flux.never().subscribe(); // 占位符，实际取消逻辑在TokenStream中
             
-            generationTaskManager.registerTask(appId, "VUE_PROJECT", disposable, sink, userId, partialContentBuilder);
+            generationTaskManager.registerTask(appId, codeGenType.getValue(), disposable, sink, userId, partialContentBuilder);
             
             tokenStream.onPartialResponse((String partialResponse) -> {
                         AiResponseMessage aiResponseMessage = new AiResponseMessage(partialResponse);
@@ -227,14 +378,151 @@ public class AiCodeGeneratorFacade {
                         sink.next(JSONUtil.toJsonStr(toolExecutedMessage));
                     })
                     .onCompleteResponse((ChatResponse response) -> {
-                        // 执行 Vue 项目构建（同步执行，确保预览时项目已就绪）
-                        String projectPath = AppConstant.CODE_OUTPUT_ROOT_DIR + "/vue_project_" + appId;
-                        vueProjectBuilder.buildProject(projectPath);
+                        if (response == null) {
+                            log.warn("收到空的完整响应，跳过处理");
+                            generationTaskManager.completeTask(appId);
+                            sink.complete();
+                            return;
+                        }
+
+                        // 统计并更新用户token消耗
+                        try {
+                            dev.langchain4j.model.output.TokenUsage tokenUsage = response.metadata().tokenUsage();
+                            if (tokenUsage != null) {
+                                // 计算总token消耗（input + output）
+                                Long inputTokens = tokenUsage.inputTokenCount() != null ? tokenUsage.inputTokenCount() : 0L;
+                                Long outputTokens = tokenUsage.outputTokenCount() != null ? tokenUsage.outputTokenCount() : 0L;
+                                Long consumedTokens = inputTokens + outputTokens;
+
+                                if (consumedTokens > 0) {
+                                    boolean success = tokenService.consumeTokens(userId, consumedTokens);
+                                    if (success) {
+                                        log.info("用户 {} 消耗token成功，消耗: {}", userId, consumedTokens);
+                                    } else {
+                                        log.warn("用户 {} 消耗token失败，消耗: {}", userId, consumedTokens);
+                                    }
+                                }
+                            }
+                        } catch (Exception e) {
+                            log.error("统计用户token消耗失败: userId={}, error={}", userId, e.getMessage(), e);
+                        }
+
+                        // 根据代码生成类型执行不同的后处理逻辑
+                        try {
+                            if (codeGenType == CodeGenTypeEnum.VUE_PROJECT) {
+                                // Vue项目异步构建，避免阻塞流式响应
+                                String projectPath = AppConstant.CODE_OUTPUT_ROOT_DIR + "/vue_project_" + appId;
+                                vueProjectBuilder.buildProjectAsync(projectPath, appId, userId);
+                                log.info("Vue项目构建已启动（异步）: {}", projectPath);
+                            } else if (codeGenType == CodeGenTypeEnum.HTML || codeGenType == CodeGenTypeEnum.MULTI_FILE) {
+                                // HTML和MULTI_FILE类型的代码保存
+                                String completeCode = partialContentBuilder.toString();
+                                if (completeCode != null && !completeCode.trim().isEmpty()) {
+                                    // 使用执行器解析代码
+                                    Object parsedResult = CodeParserExecutor.executeParser(completeCode, codeGenType);
+                                    // 使用执行器保存代码
+                                    File saveDir = CodeFileSaverExecutor.executeSaver(parsedResult, codeGenType, appId);
+                                    log.info("保存成功，目录为：{}", saveDir.getAbsolutePath());
+                                }
+                            }
+                        } catch (Exception e) {
+                            log.error("代码保存失败: {}", e.getMessage());
+                        }
 
                         generationTaskManager.completeTask(appId);
                         sink.complete();
                     })
                     .onError((Throwable error) -> {
+                        error.printStackTrace();
+                        generationTaskManager.completeTask(appId);
+                        sink.error(error);
+                    })
+                    .start();
+        });
+    }
+
+    /**
+     * Vue 预占版本：按实际使用对预占进行多退少补，不再重复调用通用的 consumeTokens。
+     */
+    private Flux<String> processTokenStreamWithReservation(TokenStream tokenStream, Long appId, Long userId,
+                                                           CodeGenTypeEnum codeGenType, String reservationId,
+                                                           long estimatedTokens) {
+        StringBuilder partialContentBuilder = new StringBuilder();
+        return Flux.create((FluxSink<String> sink) -> {
+            Disposable disposable = Flux.never().subscribe();
+            generationTaskManager.registerTask(appId, codeGenType.getValue(), disposable, sink, userId, partialContentBuilder);
+
+            tokenStream.onPartialResponse((String partialResponse) -> {
+                        AiResponseMessage aiResponseMessage = new AiResponseMessage(partialResponse);
+                        partialContentBuilder.append(partialResponse);
+                        sink.next(JSONUtil.toJsonStr(aiResponseMessage));
+                    })
+                    .onPartialToolExecutionRequest((index, toolExecutionRequest) -> {
+                        ToolRequestMessage toolRequestMessage = new ToolRequestMessage(toolExecutionRequest);
+                        sink.next(JSONUtil.toJsonStr(toolRequestMessage));
+                    })
+                    .onToolExecuted((ToolExecution toolExecution) -> {
+                        log.info("工具执行完成: toolName={}, result={}",
+                                toolExecution.request().name(),
+                                cn.hutool.core.util.StrUtil.maxLength(toolExecution.result(), 100));
+                        ToolExecutedMessage toolExecutedMessage = new ToolExecutedMessage(toolExecution);
+                        sink.next(JSONUtil.toJsonStr(toolExecutedMessage));
+                    })
+                    .onCompleteResponse((ChatResponse response) -> {
+                        if (response == null) {
+                            log.warn("收到空的完整响应，跳过处理");
+                            generationTaskManager.completeTask(appId);
+                            sink.complete();
+                            return;
+                        }
+
+                        try {
+                            dev.langchain4j.model.output.TokenUsage tokenUsage = response.metadata().tokenUsage();
+                            if (tokenUsage != null) {
+                                long inputTokens = tokenUsage.inputTokenCount() != null ? tokenUsage.inputTokenCount() : 0L;
+                                long outputTokens = tokenUsage.outputTokenCount() != null ? tokenUsage.outputTokenCount() : 0L;
+                                long actual = inputTokens + outputTokens;
+                                if (reservationId != null && estimatedTokens > 0) {
+                                    if (actual > estimatedTokens) {
+                                        long delta = actual - estimatedTokens;
+                                        // 预占不够，补扣差额
+                                        tokenService.consumeTokens(userId, delta);
+                                    } else if (actual < estimatedTokens) {
+                                        long refund = estimatedTokens - actual;
+                                        tokenService.refund(userId, refund, reservationId);
+                                    }
+                                } else {
+                                    // 无预占，走通用消费
+                                    if (actual > 0) {
+                                        tokenService.consumeTokens(userId, actual);
+                                    }
+                                }
+                            }
+                        } catch (Exception e) {
+                            log.error("统计用户token消耗(预占)失败: userId={}, error={}", userId, e.getMessage(), e);
+                        }
+
+                        // 后处理，与通用一致
+                        try {
+                            if (codeGenType == CodeGenTypeEnum.VUE_PROJECT) {
+                                String projectPath = AppConstant.CODE_OUTPUT_ROOT_DIR + "/vue_project_" + appId;
+                                vueProjectBuilder.buildProjectAsync(projectPath, appId, userId);
+                                log.info("Vue项目构建已启动（异步）: {}", projectPath);
+                            }
+                        } catch (Exception e) {
+                            log.error("代码保存失败: {}", e.getMessage());
+                        }
+
+                        generationTaskManager.completeTask(appId);
+                        sink.complete();
+                    })
+                    .onError((Throwable error) -> {
+                        // 失败则退还全部预占
+                        try {
+                            if (reservationId != null && estimatedTokens > 0) {
+                                tokenService.refund(userId, estimatedTokens, reservationId);
+                            }
+                        } catch (Exception ignore) {}
                         error.printStackTrace();
                         generationTaskManager.completeTask(appId);
                         sink.error(error);

@@ -114,6 +114,10 @@
                 <div v-if="message.userName || (message.status && (message.status === 1 || message.status === 2))" class="message-footer">
                   <div v-if="message.userName" class="message-user ai-message-user">
                     回复 {{ message.userName }}
+                    <!-- 所有用户都显示token消耗信息 -->
+                    <span v-if="message.tokenInfo" class="token-consumption">
+                      本次消耗: {{ message.tokenInfo.consumedTokens || 0 }} tokens | 剩余额度: {{ message.tokenInfo.remainingTokens || 0 }} tokens
+                    </span>
                   </div>
                   <div v-if="message.status && (message.status === 1 || message.status === 2)" class="message-status">
                     <a-tag :color="message.status === 1 ? 'orange' : 'red'" size="small">
@@ -303,8 +307,16 @@
             <a-spin size="large" />
             <p>{{ otherGeneratingUser.userName }} 正在生成网站...</p>
           </div>
+          <div v-else-if="isVueBuilding" class="preview-loading">
+            <a-spin size="large" />
+            <p>正在构建网站，请稍候...</p>
+            <div class="build-tips">
+              <p>Vue项目需要额外的构建时间，通常需要30秒左右</p>
+              <p>如果长时间未显示预览，请刷新网页</p>
+            </div>
+          </div>
           <iframe
-            v-else
+            v-else-if="!isVueBuilding"
             ref="previewIframe"
             :src="previewUrl"
             class="preview-iframe"
@@ -351,6 +363,7 @@ import { canEditApp, hasPermission, PERMISSIONS } from '../../utils/permissionUt
 import { listAppChatHistory } from '../../api/chatHistoryController'
 import { CodeGenTypeEnum, formatCodeGenType } from '@/utils/codeGenTypes'
 import request from '@/request'
+import { getUserTokenInfo } from '../../api/userController'
 
 import MarkdownRenderer from '@/components/MarkdownRenderer.vue'
 import AppDetailModal from '@/components/AppDetailModal.vue'
@@ -396,9 +409,43 @@ const streamingContent = ref<string>('')
 const streamingUser = ref<API.UserVO | null>(null)
 const isStreamingFromOther = ref(false)
 
-// 其他用户代码生成状态
+// 其他用户生成状态相关
 const isOtherUserGenerating = ref(false)
 const otherGeneratingUser = ref<API.UserVO | null>(null)
+
+// 更新消息的token信息
+const updateTokenInfoForMessage = async (messageIndex: number) => {
+  try {
+    const res = await getUserTokenInfo()
+    if (res.data.code === 0 && res.data.data) {
+      const tokenData = res.data.data
+      const message = messages.value[messageIndex]
+      if (message && message.messageType === 'ai') {
+        // 添加用户角色信息
+        message.userRole = tokenData.userRole
+        
+        // 所有用户都计算和显示token信息
+        // 计算本次消耗的token（这里简化处理，实际应该从后端获取）
+        const consumedTokens = Math.max(100, Math.floor((message.content?.length || 0) / 2))
+        const remainingTokens = (tokenData.totalTokens || 10000) - (tokenData.usedTokens || 0)
+        
+        message.tokenInfo = {
+          consumedTokens,
+          remainingTokens
+        }
+        
+        console.log(`用户 ${tokenData.userRole} 的token信息:`, message.tokenInfo)
+        
+        // 刷新全局token信息，更新头部显示
+        const { useTokenInfoStore } = await import('@/stores/tokenInfo')
+        const tokenInfoStore = useTokenInfoStore()
+        await tokenInfoStore.refreshTokenInfo()
+      }
+    }
+  } catch (error) {
+    console.error('获取token信息失败:', error)
+  }
+}
 
 // 对话相关
 interface Message {
@@ -409,14 +456,22 @@ interface Message {
   createTime?: string
   userName?: string
   userAvatar?: string
+  userRole?: string // 用户角色：user/admin/member
   status?: number
   type?: string // 消息类型：text-文字，image-图片
+  tokenInfo?: {
+    consumedTokens?: number
+    remainingTokens?: number
+  }
 }
 
 const messages = ref<Message[]>([])
 const userInput = ref('')
 const isGenerating = ref(false)
 const messagesContainer = ref<HTMLElement>()
+
+// Vue项目构建状态
+const isVueBuilding = ref(false)
 
 // 上传相关状态
 const uploadedImages = ref<string[]>([])
@@ -475,7 +530,7 @@ const previewIframe = ref<HTMLIFrameElement>()
 
 // WebSocket连接
 const connectWebSocket = () => {
-  if (!appId.value || !isTeamApp.value) return
+  if (!appId.value) return
 
   try {
     // 构建WebSocket URL
@@ -643,6 +698,14 @@ const handleWebSocketMessage = (data: any) => {
       // 处理错误消息
       console.error('WebSocket错误:', data.message)
       message.error(data.message || 'WebSocket连接出现错误')
+      break
+
+    case 'VUE_BUILD_COMPLETE':
+      // Vue项目构建完成，立即更新预览
+      console.log('Vue项目构建完成，更新预览')
+      isVueBuilding.value = false
+      message.success('网站构建完成！正在显示预览...')
+      updatePreview()
       break
   }
 }
@@ -821,15 +884,24 @@ const loadChatHistory = async (loadMore = false) => {
       const historyMessages = historyData.records || []
       
       // 转换历史消息格式
-      const formattedMessages: Message[] = historyMessages.map(msg => ({
-        id: msg.id,
-        messageType: msg.messageType === 'user' ? 'user' : 'ai',
-        content: msg.message || '',
-        createTime: msg.createTime,
-        userName: msg.userName,
-        status: msg.status,
-        type: msg.type || 'text', // 映射后端的type字段，text-文字，image-图片
-      }))
+      const formattedMessages: Message[] = historyMessages.map(msg => {
+        let content = msg.message || '';
+        
+        // 如果是AI消息且状态为异常中断，过滤技术错误信息
+        if (msg.messageType === 'ai' && msg.status === 2) {
+          content = sanitizeErrorMessage(content);
+        }
+        
+        return {
+          id: msg.id,
+          messageType: msg.messageType === 'user' ? 'user' : 'ai',
+          content: content,
+          createTime: msg.createTime,
+          userName: msg.userName,
+          status: msg.status,
+          type: msg.type || 'text', // 映射后端的type字段，text-文字，image-图片
+        };
+      })
 
       if (loadMore) {
         // 加载更多时，将新消息插入到现有消息前面
@@ -1116,13 +1188,22 @@ const generateCode = async (userMessage: string, aiMessageIndex: number, imageUr
     })
 
     // 处理done事件
-    currentEventSource.addEventListener('done', function () {
+    currentEventSource.addEventListener('done', async function () {
       if (streamCompleted) return
 
       streamCompleted = true
       isGenerating.value = false
       currentEventSource?.close()
       currentEventSource = null
+
+      // 获取最新的token信息并更新到消息中
+      updateTokenInfoForMessage(aiMessageIndex)
+
+      // 检查是否是Vue项目，如果是则设置构建状态
+      const codeGenType = appInfo.value?.codeGenType || CodeGenTypeEnum.HTML
+      if (codeGenType === CodeGenTypeEnum.VUE_PROJECT) {
+        isVueBuilding.value = true
+      }
 
       // 只在团队应用中发送退出编辑状态消息
       if (isTeamApp.value) {
@@ -1137,11 +1218,10 @@ const generateCode = async (userMessage: string, aiMessageIndex: number, imageUr
         })
       }
 
-      // 延迟更新预览，确保后端已完成处理
-      setTimeout(async () => {
-        await fetchAppInfo()
+      // 非Vue项目立即更新预览，Vue项目等待VUE_BUILD_COMPLETE消息
+      if (codeGenType !== CodeGenTypeEnum.VUE_PROJECT) {
         updatePreview()
-      }, 1000)
+      }
     })
 
     // 处理错误
@@ -1245,12 +1325,82 @@ const stopGeneration = async () => {
   }
 }
 
+// 错误信息清洗函数（对应后端的ErrorMessageUtils.sanitize）
+const sanitizeErrorMessage = (rawMessage: string): string => {
+  if (!rawMessage || rawMessage.trim() === '') {
+    return '系统错误，请稍后重试';
+  }
+  
+  const msg = rawMessage.toLowerCase();
+  
+  // 常见错误信息清洗
+  if (msg.includes('range of input length')) {
+    return '输入内容过长，请精简到 6000 字符以内';
+  }
+  if (msg.includes('range of max_tokens') || msg.includes('max_tokens')) {
+    return '生成长度超出限制，请减少输出长度或分段生成';
+  }
+  if (msg.includes('tool_calls') && msg.includes('must be followed')) {
+    return '模型调用工具异常，请重试';
+  }
+  if (msg.includes('internal_server_error') || msg.includes('internalerror')) {
+    return '服务繁忙，请稍后重试';
+  }
+  if (msg.includes('nullpointerexception') || msg.includes('null')) {
+    return '系统处理异常，请重试';
+  }
+  if (msg.includes('argument type mismatch') || msg.includes('type mismatch')) {
+    return '参数处理异常，请重试';
+  }
+  if (msg.includes('tool') && msg.includes('execution')) {
+    return '功能调用异常，请重试';
+  }
+  if (msg.includes('cannot invoke') && msg.includes('null')) {
+    return '系统处理异常，请重试';
+  }
+  if (msg.includes('ai回复失败:')) {
+    // 如果是"AI回复失败:"开头的消息，提取后面的错误信息进行清洗
+    const errorPart = rawMessage.substring(rawMessage.indexOf('AI回复失败:') + 6);
+    return sanitizeErrorMessage(errorPart);
+  }
+  
+  // 默认友好错误信息
+  return '系统错误，请稍后重试';
+};
+
 // 错误处理函数
 const handleError = (error: unknown, aiMessageIndex: number) => {
   console.error('生成代码失败：', error)
-  messages.value[aiMessageIndex].content = '抱歉，生成过程中出现了错误，请重试。'
+  
+  // 检查是否是token不足导致的错误
+  let errorMessage = '抱歉，生成过程中出现了错误，请重试。'
+  let errorTitle = '生成失败，请重试'
+  
+  // 如果是Error对象且包含特定信息，尝试解析错误原因
+  if (error instanceof Error) {
+    const errorText = error.message || error.toString()
+    
+    // 检查是否包含token相关错误信息
+    if (errorText.includes('Token') || errorText.includes('token') || 
+        errorText.includes('额度') || errorText.includes('充值')) {
+      errorMessage = '❌ Token额度不足，请联系管理员充值'
+      errorTitle = 'Token额度不足'
+    }
+    // 检查是否是网络连接错误
+    else if (errorText.includes('Failed to fetch') || errorText.includes('Network')) {
+      errorMessage = '❌ 网络连接失败，请检查网络后重试'
+      errorTitle = '网络连接失败'
+    }
+    // 检查是否是服务器错误
+    else if (errorText.includes('500') || errorText.includes('Internal Server Error')) {
+      errorMessage = '❌ 服务器内部错误，请稍后重试'
+      errorTitle = '服务器错误'
+    }
+  }
+  
+  messages.value[aiMessageIndex].content = errorMessage
   messages.value[aiMessageIndex].loading = false
-  message.error('生成失败，请重试')
+  message.error(errorTitle)
   isGenerating.value = false
   
   // 清理 EventSource
@@ -1273,14 +1423,22 @@ const handleError = (error: unknown, aiMessageIndex: number) => {
   }
 }
 
+// 生成带缓存破坏参数的预览地址，确保 iframe 真正重新加载
+const buildPreviewUrlWithCacheBusting = (baseUrl: string) => {
+  const separator = baseUrl.includes('?') ? '&' : '?'
+  return `${baseUrl}${separator}t=${Date.now()}`
+}
+
 // 更新预览
 const updatePreview = () => {
-  if (appId.value) {
-    const codeGenType = appInfo.value?.codeGenType || CodeGenTypeEnum.HTML
-    const newPreviewUrl = getStaticPreviewUrl(codeGenType, appId.value)
-    previewUrl.value = newPreviewUrl
-    previewReady.value = true
+  if (!appId.value) {
+    return
   }
+
+  const codeGenType = appInfo.value?.codeGenType || CodeGenTypeEnum.HTML
+  const baseUrl = getStaticPreviewUrl(codeGenType, appId.value)
+  previewReady.value = false
+  previewUrl.value = buildPreviewUrlWithCacheBusting(baseUrl)
 }
 
 // 滚动到底部
@@ -1777,6 +1935,13 @@ onUnmounted(() => {
   font-style: italic;
 }
 
+.token-consumption {
+  color: #ff4d4f;
+  font-size: 14px;
+  font-style: normal;
+  margin-left: 8px;
+}
+
 .message-avatar {
   flex-shrink: 0;
 }
@@ -2040,6 +2205,18 @@ onUnmounted(() => {
 
 .preview-loading p {
   margin-top: 16px;
+  font-size: 16px;
+}
+
+.build-tips {
+  margin-top: 8px;
+  text-align: center;
+}
+
+.build-tips p {
+  font-size: 14px;
+  color: #999;
+  margin: 4px 0;
 }
 
 .preview-iframe {

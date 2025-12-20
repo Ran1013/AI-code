@@ -1,6 +1,5 @@
 package com.ran.aicode.controller;
 
-import cn.dev33.satoken.annotation.SaCheckLogin;
 import com.ran.aicode.constant.AppConstant;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
@@ -35,12 +34,17 @@ public class StaticResourceController {
      * 访问格式：http://localhost:8123/api/static/{deployKey}[/{fileName}]
      * 支持Vue项目的dist目录访问
      */
-    @GetMapping("/{deployKey}/**")
-    @SaCheckLogin
+    @GetMapping("/{deployKey:[a-zA-Z0-9_-]+}/**")
     public ResponseEntity<Resource> serveStaticResource(
             @PathVariable String deployKey,
             HttpServletRequest request) {
         try {
+            // 排除特定的路径，避免与 API 文档等功能冲突
+            if ("swagger".equals(deployKey) || "doc".equals(deployKey) || "api-docs".equals(deployKey)) {
+                log.warn("拒绝访问保留路径: {}", deployKey);
+                return ResponseEntity.notFound().build();
+            }
+
             // 获取资源路径
             String resourcePath = (String) request.getAttribute(HandlerMapping.PATH_WITHIN_HANDLER_MAPPING_ATTRIBUTE);
             resourcePath = resourcePath.substring(("/static/" + deployKey).length());

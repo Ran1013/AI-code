@@ -38,9 +38,10 @@ public interface UserService extends IService<User> {
      * @param userAccount   用户账户
      * @param userPassword  用户密码
      * @param checkPassword 校验密码
+     * @param verifyCode    邮箱验证码
      * @return 新用户 id
      */
-    long userRegister(String userAccount, String userPassword, String checkPassword);
+    long userRegister(String userAccount, String userPassword, String checkPassword, String verifyCode);
     /**
      * 用户登录
      *
@@ -105,5 +106,16 @@ public interface UserService extends IService<User> {
      * @return 用户对象
      */
     User getUserByUserAccount(String userAccount);
+
+    /**
+     * 修改密码
+     *
+     * @param email        邮箱
+     * @param verifyCode   验证码
+     * @param newPassword  新密码
+     * @param checkPassword 确认新密码
+     * @return 是否修改成功
+     */
+    boolean updatePassword(String email, String verifyCode, String newPassword, String checkPassword);
 
 }

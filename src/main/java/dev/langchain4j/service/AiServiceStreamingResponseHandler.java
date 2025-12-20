@@ -108,11 +108,29 @@ class AiServiceStreamingResponseHandler implements StreamingChatResponseHandler 
     @Override
     public void onPartialToolExecutionRequest(int index, ToolExecutionRequest partialToolExecutionRequest) {
         // If we're using output guardrails, then buffer the partial response until the guardrails have completed
-        partialToolExecutionRequestHandler.accept(index, partialToolExecutionRequest);
+        if (partialToolExecutionRequestHandler != null) {
+            partialToolExecutionRequestHandler.accept(index, partialToolExecutionRequest);
+        }
     }
 
     @Override
     public void onCompleteResponse(ChatResponse completeResponse) {
+        if (completeResponse == null) {
+            LOG.warn("收到空的完整响应，可能是流被意外中断");
+            // 执行清理逻辑
+            if (completeResponseHandler != null) {
+                // 创建一个空的响应来触发清理
+                ChatResponse emptyResponse = ChatResponse.builder()
+                    .aiMessage(AiMessage.from(""))
+                    .metadata(dev.langchain4j.model.chat.response.ChatResponseMetadata.builder()
+                        .tokenUsage(new TokenUsage())
+                        .build())
+                    .build();
+                completeResponseHandler.accept(emptyResponse);
+            }
+            return;
+        }
+
         AiMessage aiMessage = completeResponse.aiMessage();
         addToMemory(aiMessage);
 

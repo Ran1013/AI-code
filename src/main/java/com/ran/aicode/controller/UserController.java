@@ -19,9 +19,11 @@ import com.ran.aicode.model.vo.LoginUserVO;
 import com.ran.aicode.model.vo.UserVO;
 import com.ran.aicode.service.AuthService;
 import com.ran.aicode.service.UserService;
+import com.ran.aicode.service.TokenService;
 import com.mybatisflex.core.paginate.Page;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 import com.mybatisflex.core.query.QueryWrapper;
@@ -33,6 +35,7 @@ import java.util.List;
  *
  * @author <a>ran</a>
  */
+@Slf4j
 @RestController
 @RequestMapping("/user")
 public class UserController {
@@ -42,21 +45,25 @@ public class UserController {
 
     @Resource
     private AuthService authService;
-//    /**
-//     * 用户注册（当前登录已改为“存在即登，不存在自动创建后登录”，该接口暂不开放）
-//     *
-//     * @param userRegisterRequest 用户注册请求
-//     * @return 注册结果
-//     */
-//    @PostMapping("/register")
-//    public BaseResponse<Long> userRegister(@RequestBody UserRegisterRequest userRegisterRequest) {
-//        ThrowUtils.throwIf(userRegisterRequest == null, ErrorCode.PARAMS_ERROR);
-//        String userAccount = userRegisterRequest.getUserAccount();
-//        String userPassword = userRegisterRequest.getUserPassword();
-//        String checkPassword = userRegisterRequest.getCheckPassword();
-//        long result = userService.userRegister(userAccount, userPassword, checkPassword);
-//        return ResultUtils.success(result);
-//    }
+
+    @Resource
+    private TokenService tokenService;
+  /**
+     * 用户注册
+     *
+     * @param userRegisterRequest 用户注册请求
+     * @return 注册结果
+     */
+    @PostMapping("/register")
+    public BaseResponse<Long> userRegister(@RequestBody UserRegisterRequest userRegisterRequest) {
+        ThrowUtils.throwIf(userRegisterRequest == null, ErrorCode.PARAMS_ERROR);
+        String userAccount = userRegisterRequest.getUserAccount();
+        String userPassword = userRegisterRequest.getUserPassword();
+        String checkPassword = userRegisterRequest.getCheckPassword();
+        String verifyCode = userRegisterRequest.getVerifyCode();
+        long result = userService.userRegister(userAccount, userPassword, checkPassword, verifyCode);
+        return ResultUtils.success(result);
+    }
     /**
      * 发送验证码
      */
@@ -89,6 +96,24 @@ public class UserController {
     public BaseResponse<Boolean> userLogout(HttpServletRequest request) {
         ThrowUtils.throwIf(request == null, ErrorCode.PARAMS_ERROR);
         boolean result = userService.userLogout(request);
+        return ResultUtils.success(result);
+    }
+
+    /**
+     * 修改密码
+     *
+     * @param updatePasswordRequest 修改密码请求
+     * @return 是否修改成功
+     */
+    @PostMapping("/updatePassword")
+    public BaseResponse<Boolean> updatePassword(@RequestBody UpdatePasswordRequest updatePasswordRequest) {
+        ThrowUtils.throwIf(updatePasswordRequest == null, ErrorCode.PARAMS_ERROR);
+        String email = updatePasswordRequest.getEmail();
+        String verifyCode = updatePasswordRequest.getVerifyCode();
+        String newPassword = updatePasswordRequest.getNewPassword();
+        String checkPassword = updatePasswordRequest.getCheckPassword();
+
+        boolean result = userService.updatePassword(email, verifyCode, newPassword, checkPassword);
         return ResultUtils.success(result);
     }
 
@@ -224,6 +249,45 @@ public class UserController {
         List<UserVO> userVOList = userService.getUserVOList(userPage.getRecords());
         userVOPage.setRecords(userVOList);
         return ResultUtils.success(userVOPage);
+    }
+
+    /**
+     * 获取当前用户token信息
+     *
+     * @param request HTTP请求
+     * @return 用户token信息
+     */
+    @GetMapping("/token/info")
+    @SaCheckLogin
+    public BaseResponse<User> getUserTokenInfo(HttpServletRequest request) {
+        try {
+            User loginUser = userService.getLoginUser(request);
+            if (loginUser == null) {
+                throw new BusinessException(ErrorCode.NOT_LOGIN_ERROR);
+            }
+            
+            log.info("获取用户token信息，用户ID: {}", loginUser.getId());
+            
+            // 从数据库获取完整的用户token信息
+            User tokenInfo = tokenService.getUserTokenInfo(loginUser.getId());
+            if (tokenInfo == null) {
+                throw new BusinessException(ErrorCode.NOT_FOUND_ERROR, "用户token信息不存在");
+            }
+            
+            // 确保返回完整的用户信息
+            tokenInfo.setUserAccount(loginUser.getUserAccount());
+            tokenInfo.setUserName(loginUser.getUserName());
+            tokenInfo.setUserRole(loginUser.getUserRole());
+            
+            log.info("返回token信息: 用户ID={}, 总token={}, 已使用={}, 剩余={}", 
+                tokenInfo.getId(), tokenInfo.getTotalTokens(), 
+                tokenInfo.getUsedTokens(), tokenInfo.getRemainingTokens());
+            
+            return ResultUtils.success(tokenInfo);
+        } catch (Exception e) {
+            log.error("获取用户token信息失败", e);
+            throw new BusinessException(ErrorCode.SYSTEM_ERROR, "获取token信息失败: " + e.getMessage());
+        }
     }
 
 }

@@ -43,29 +43,32 @@ public class AiCodeGeneratorServiceFactory {
      */
     private AiCodeGeneratorService createAiCodeGeneratorService(long appId, CodeGenTypeEnum codeGenType) {
         // 根据 appId 构建独立的对话记忆
+        // 限制历史消息为10条以避免消息总长度过长导致API错误（code 1214）
         MessageWindowChatMemory chatMemory = MessageWindowChatMemory
                 .builder()
                 .id(appId)
                 .chatMemoryStore(redisChatMemoryStore)
-                .maxMessages(20)
+                .maxMessages(120)
                 .build();
         // 从数据库加载历史对话到记忆中
-        chatHistoryService.loadChatHistoryToMemory(appId, chatMemory, 20);
+        // 注意：maxMessages(120)确保最多保留60对完整的user-ai对话
+        // loadChatHistoryToMemory会验证并修复消息顺序
+        chatHistoryService.loadChatHistoryToMemory(appId, chatMemory, 120);
         // 根据代码生成类型选择不同的模型配置
         return switch (codeGenType) {
             case VUE_PROJECT -> {
-                // 使用多例模式的 StreamingChatModel 解决并发问题（VUE 项目生成链路保留流式 + 工具能力）
+                // 使用多例模式的 StreamingChatModel 解决并发问题（VUE 项目生成链路保留流式）
                 StreamingChatModel reasoningStreamingChatModel = SpringContextUtil.getBean("reasoningStreamingChatModelPrototype", StreamingChatModel.class);
                 yield AiServices.builder(AiCodeGeneratorService.class)
                         .chatModel(chatModel) // 添加非流式chatModel用于generateAppName
                         .streamingChatModel(reasoningStreamingChatModel)
                         .chatMemoryProvider(memoryId -> chatMemory)
                         .tools((Object[]) toolManager.getAllTools())
-                        .maxSequentialToolsInvocations(15)
+                .maxSequentialToolsInvocations(30)
 //                        .inputGuardrails(new PromptSafetyInputGuardrail())
-                        .hallucinatedToolNameStrategy(toolExecutionRequest -> ToolExecutionResultMessage.from(
-                                toolExecutionRequest, "Error: there is no tool called " + toolExecutionRequest.name()
-                        ))
+                .hallucinatedToolNameStrategy(toolExecutionRequest -> ToolExecutionResultMessage.from(
+                        toolExecutionRequest, "Error: there is no tool called " + toolExecutionRequest.name()
+                ))
                         .build();
             }
             case HTML, MULTI_FILE -> {
@@ -76,7 +79,7 @@ public class AiCodeGeneratorServiceFactory {
                         .streamingChatModel(openAiStreamingChatModel)
                         .chatMemoryProvider(memoryId -> chatMemory)
                         .tools((Object[]) toolManager.getAllTools())
-                        .maxSequentialToolsInvocations(15)
+                        .maxSequentialToolsInvocations(30)
 //                        .inputGuardrails(new PromptSafetyInputGuardrail()) // 添加输入护轨
                         .hallucinatedToolNameStrategy(toolExecutionRequest -> ToolExecutionResultMessage.from(
                                 toolExecutionRequest, "Error: there is no tool called " + toolExecutionRequest.name()

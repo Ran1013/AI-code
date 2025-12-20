@@ -79,27 +79,69 @@ knife4j:
 langchain4j:
   open-ai:
     chat-model:
-      base-url: https://api.siliconflow.cn/v1/chat/completions
-      api-key: <YOUR_SILICONFLOW_API_KEY>
-      model-name: deepseek-ai/DeepSeek-V3.1
-      max-tokens: 8192
+      base-url: https://dashscope.aliyuncs.com/compatible-mode/v1
+      api-key: <YOUR_DASHSCOPE_API_KEY>
+      #base-url: https://api.siliconflow.cn/v1
+      #api-key: <YOUR_SILICONFLOW_API_KEY>
+      #model-name: qwen3-coder-plus
+      model-name: qwen-turbo
+      max-tokens: 2048
       log-requests: false
       log-responses: false
+
     streaming-chat-model:
-      base-url: https://api.siliconflow.cn/v1/chat/completions
-      api-key: <YOUR_SILICONFLOW_API_KEY>
-      model-name: deepseek-ai/DeepSeek-V3.1
-      max-tokens: 8192
+      base-url: https://dashscope.aliyuncs.com/compatible-mode/v1
+      api-key: <YOUR_DASHSCOPE_API_KEY>
+      #model-name: qwen3-coder-plus
+      model-name: qwen-turbo
+      max-tokens: 4096
       log-requests: false
       log-responses: false
+
+    # 推理 AI 模型配置（用于复杂的推理任务）
     reasoning-streaming-chat-model:
-      base-url: https://api.siliconflow.cn/v1/chat/completions
-      api-key: <YOUR_SILICONFLOW_API_KEY>
-      model-name: Pro/deepseek-ai/DeepSeek-V3.1
-      max-tokens: 32768
+      base-url: https://dashscope.aliyuncs.com/compatible-mode/v1
+      api-key: <YOUR_DASHSCOPE_API_KEY>
+      
+      # ========== 当前使用的模型（最便宜最快） ==========
+      #model-name: qwen-turbo                          # ⭐⭐⭐⭐⭐ 最便宜最快选择
+      #model-name: qwen-flash-2025-07-28              # ⭐⭐⭐⭐ 便宜快速
+      #model-name: qwen-flash                         # ⭐⭐⭐⭐ 便宜快速
+      model-name: qwen-coder-turbo-0919                     # ⭐⭐⭐⭐⭐ 代码专用最便宜选择
+
+      # ========== 超便宜梯队：极致性价比（价格优先） ==========
+      #model-name: qwen-turbo                         # ⭐⭐⭐⭐⭐ 最便宜最快
+      #model-name: qwen-coder-turbo                   # ⭐⭐⭐⭐⭐ 代码专用最便宜
+      #model-name: qwen-flash                         # ⭐⭐⭐⭐ 便宜快速
+      #model-name: deepseek-v3                        # ⭐⭐⭐⭐ 便宜基础功能
+      #model-name: qwen3-coder-flash                  # ⭐⭐⭐⭐ 代码专用便宜版
+      
+      # ========== 便宜梯队：性价比选择（平衡价格和性能） ==========
+      #model-name: qwen-plus                          # ⭐⭐⭐ 便宜稳定
+      #model-name: deepseek-v3.1                      # ⭐⭐⭐ 便宜高性能
+      #model-name: qwen3-coder-plus                   # ⭐⭐⭐ 代码专用便宜版
+      
+      # ========== 中等梯队：性能提升（性能优先） ==========
+      #model-name: qwen-max                           # ⭐⭐ 成熟稳定但较贵
+      #model-name: qwen3-30b-a3b                      # ⭐⭐ 高性能但较贵
+      #model-name: deepseek-r1                        # ⭐⭐ 最强推理但较贵
+      
+      # ========== 高端梯队：最强性能（性能优先） ==========
+      #model-name: qwen3-next-80b-a3b-thinking        # ⭐ 最佳平衡但很贵
+      #model-name: qwen3-235b-a22b-thinking-2507       # ⭐ 高性能但很贵
+      #model-name: qwen3-235b-a22b-instruct-2507      # ⭐ 高性能但很贵
+      #model-name: qwen3-235b-a22b                    # ⭐ 高性能但很贵
+
+      #max-tokens: 32768
+      max-tokens: 8192
+    
       temperature: 0.1
+      # log-requests: true
+      # log-responses: true
       log-requests: false
       log-responses: false
+
+    # 智能路由 AI 模型配置
     routing-chat-model:
       base-url: https://dashscope.aliyuncs.com/compatible-mode/v1
       api-key: <YOUR_DASHSCOPE_API_KEY>
@@ -111,6 +153,7 @@ langchain4j:
 # 华为云 OBS 对象存储配置
 obs:
   client:
+    host: https://your-bucket-name.obs.cn-north-4.myhuaweicloud.com
     endpoint: obs.cn-north-4.myhuaweicloud.com
     accessKey: <YOUR_OBS_ACCESS_KEY>
     secretKey: <YOUR_OBS_SECRET_KEY>
@@ -133,11 +176,11 @@ dashscope:
 
 # 腾讯云 API 配置
 tencent:
-  secret-id: <YOUR_TENCENT_CLOUD_SECRET_ID>
-  secret-key: <YOUR_TENCENT_CLOUD_SECRET_KEY>
+  secret-id: <YOUR_TENCENT_CLOUD_SECRET_ID> # 请替换为你的腾讯云SecretId
+  secret-key: <YOUR_TENCENT_CLOUD_SECRET_KEY> # 请替换为你的腾讯云SecretKey
   ses:
     region: ap-guangzhou # 邮件服务地域，例如 ap-guangzhou
-    template-id: 12345 # 请替换为你在腾讯云创建的邮件模板ID
+    template-id: 35831 # 请替换为你在腾讯云创建的邮件模板ID
 
 # Pexels 图片搜索配置
 pexels:
@@ -157,4 +200,9 @@ hotkey:
 
 # 部署路径
 code:
-  deploy-host: http://your-deploy-host/dist
+  deploy-host: http://localhost/dist
+
+logging:
+  level:
+    "[org.springframework.boot.context.properties]": DEBUG
+    "[com.jd.platform.hotkey]": ERROR

@@ -54,9 +54,9 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
     private AuthService authService;
 
     @Override
-    public long userRegister(String userAccount, String userPassword, String checkPassword) {
+    public long userRegister(String userAccount, String userPassword, String checkPassword, String verifyCode) {
         // 1. 校验
-        if (StrUtil.hasBlank(userAccount, userPassword, checkPassword)) {
+        if (StrUtil.hasBlank(userAccount, userPassword, checkPassword, verifyCode)) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "参数为空");
         }
         if (userAccount.length() < 4) {
@@ -75,18 +75,42 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         if (count > 0) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "账号重复");
         }
-        // 3. 加密
+
+        // 3. 校验验证码（直接验证邮箱验证码）
+        try {
+            boolean ok = authService.verifyCodeByEmail(userAccount, verifyCode);
+            if (!ok) {
+                throw new BusinessException(ErrorCode.OPERATION_ERROR, "验证码校验未通过");
+            }
+        } catch (Exception e) {
+            throw new BusinessException(ErrorCode.OPERATION_ERROR, "验证码验证失败：" + e.getMessage());
+        }
+
+        // 4. 加密
         String encryptPassword = getEncryptPassword(userPassword);
-        // 4. 插入数据
+        // 5. 生成随机用户名
+        String randomUsername = generateRandomUsername();
+        // 6. 插入数据
         User user = new User();
         user.setUserAccount(userAccount);
         user.setUserPassword(encryptPassword);
-        user.setUserName(userAccount);
+        user.setUserName(randomUsername);
         user.setUserRole(UserRoleEnum.USER.getValue());
+        user.setTotalTokens(150000L); // 新用户默认150000 token
+        user.setUsedTokens(0L);
         boolean saveResult = this.save(user);
         if (!saveResult) {
             throw new BusinessException(ErrorCode.SYSTEM_ERROR, "注册失败，数据库错误");
         }
+
+        // 6. 清理验证码相关key
+        try {
+            redisTemplate.delete("verify:code:" + userAccount);
+            redisTemplate.delete("verify:fail:" + userAccount);
+        } catch (Exception ignore) {
+            log.warn("清理验证码缓存失败", ignore);
+        }
+
         return user.getId();
     }
 
@@ -99,55 +123,81 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
 
     @Override
     public LoginUserVO userLogin(String userAccount, String userPassword, String verifyCode, HttpServletRequest request) {
-        // 1. 基础校验（验证码登录：不再校验密码）
+        // 1. 基础校验
         if (StrUtil.isBlank(userAccount)) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "账号不能为空");
         }
-        String reqCode = StrUtil.isBlank(verifyCode) ? request.getParameter("verifyCode") : verifyCode;
-        if (StrUtil.isBlank(reqCode)) {
-            throw new BusinessException(ErrorCode.PARAMS_ERROR, "验证码不能为空");
+
+        // 2. 判断登录方式
+        boolean isPasswordLogin = StrUtil.isNotBlank(userPassword);
+        boolean isVerifyCodeLogin = StrUtil.isNotBlank(verifyCode);
+
+        if (!isPasswordLogin && !isVerifyCodeLogin) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "密码或验证码至少提供一个");
         }
 
-        // 2. 查询用户（以账号=邮箱为准）
+        // 3. 查询用户（以账号=邮箱为准）
         QueryWrapper onlyAccount = new QueryWrapper();
         onlyAccount.eq("userAccount", userAccount);
         User user = this.mapper.selectOneByQuery(onlyAccount);
-        if (user == null) {
-            // 不存在则自动创建用户（默认角色 user，昵称为邮箱）
-            user = new User();
-            user.setUserAccount(userAccount);
-            user.setUserName(userAccount);
-            user.setUserRole(UserRoleEnum.USER.getValue());
-            // 密码字段非空，写入随机占位密码（不可用于登录）
-            String placeholder = RandomUtil.randomString(16);
-            user.setUserPassword(getEncryptPassword(placeholder));
-            boolean created = this.save(user);
-            if (!created) {
-                throw new BusinessException(ErrorCode.SYSTEM_ERROR, "自动创建用户失败");
+
+        // 4. 密码登录逻辑
+        if (isPasswordLogin) {
+            if (user == null) {
+                throw new BusinessException(ErrorCode.PARAMS_ERROR, "用户不存在，请先注册");
+            }
+
+            // 校验密码
+            String encryptPassword = getEncryptPassword(userPassword);
+            if (!encryptPassword.equals(user.getUserPassword())) {
+                throw new BusinessException(ErrorCode.PARAMS_ERROR, "密码错误");
+            }
+        } else {
+            // 验证码登录逻辑
+            String reqCode = StrUtil.isBlank(verifyCode) ? request.getParameter("verifyCode") : verifyCode;
+            if (StrUtil.isBlank(reqCode)) {
+                throw new BusinessException(ErrorCode.PARAMS_ERROR, "验证码不能为空");
+            }
+
+            if (user == null) {
+                // 不存在则自动创建用户（默认角色 user，随机用户名）
+                user = new User();
+                user.setUserAccount(userAccount);
+                user.setUserName(generateRandomUsername());
+                user.setUserRole(UserRoleEnum.USER.getValue());
+                // 密码字段非空，写入随机占位密码（不可用于登录）
+                String placeholder = RandomUtil.randomString(16);
+                user.setUserPassword(getEncryptPassword(placeholder));
+                user.setTotalTokens(150000L); // 新用户默认150000 token
+                user.setUsedTokens(0L);
+                boolean created = this.save(user);
+                if (!created) {
+                    throw new BusinessException(ErrorCode.SYSTEM_ERROR, "自动创建用户失败");
+                }
+            }
+
+            // 校验验证码
+            boolean ok = authService.verifyCode(user.getId(), reqCode);
+            if (!ok) {
+                throw new BusinessException(ErrorCode.OPERATION_ERROR, "验证码校验未通过");
+            }
+
+            // 清理验证码相关key
+            try {
+                redisTemplate.delete("verify:code:" + userAccount);
+                redisTemplate.delete("verify:fail:" + userAccount);
+            } catch (Exception ignore) {
             }
         }
 
-        // 3. 校验验证码
-        boolean ok = authService.verifyCode(user.getId(), reqCode);
-        if (!ok) {
-            throw new BusinessException(ErrorCode.OPERATION_ERROR, "验证码校验未通过");
-        }
-
-        // 4. 设备信息与登录
+        // 5. 设备信息与登录
         String device = DeviceUtils.getRequestDevice(request);
 
         StpKit.TEAM.login(user.getId());
         StpKit.TEAM.getSession().set(UserConstant.USER_LOGIN_STATE, user);
         StpUtil.login(user.getId(), device);
-        log.info("用户登录成功 - 用户ID: {}, 设备: {}", user.getId(), device);
+        log.info("用户登录成功 - 用户ID: {}, 设备: {}, 登录方式: {}", user.getId(), device, isPasswordLogin ? "密码" : "验证码");
         StpUtil.getSession().set(USER_LOGIN_STATE, user);
-
-        try {
-            // 清理验证码相关key
-            redisTemplate.delete("verify:code:" + userAccount);
-            redisTemplate.delete("verify:fail:" + userAccount);
-        } catch (Exception ignore) {
-        }
 
         // 6. 返回脱敏信息
         return this.getLoginUserVO(user);
@@ -206,6 +256,56 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         StpUtil.checkLogin();
         // 移除登录态
         StpUtil.logout();
+        return true;
+    }
+
+    @Override
+    public boolean updatePassword(String email, String verifyCode, String newPassword, String checkPassword) {
+        // 1. 校验参数
+        if (StrUtil.hasBlank(email, verifyCode, newPassword, checkPassword)) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "参数不能为空");
+        }
+
+        if (newPassword.length() < 8) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "新密码至少8位");
+        }
+
+        if (!newPassword.equals(checkPassword)) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "两次输入的密码不一致");
+        }
+
+        // 2. 校验邮箱格式
+        if (!email.matches("^[\\w.-]+@[\\w.-]+\\.[a-zA-Z]{2,}$")) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "邮箱格式不正确");
+        }
+
+        // 3. 查询用户
+        User user = getUserByUserAccount(email);
+        if (user == null) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "用户不存在");
+        }
+
+        // 4. 校验验证码
+        boolean ok = authService.verifyCodeByEmail(email, verifyCode);
+        if (!ok) {
+            throw new BusinessException(ErrorCode.OPERATION_ERROR, "验证码校验未通过");
+        }
+
+        // 5. 更新密码
+        String encryptPassword = getEncryptPassword(newPassword);
+        user.setUserPassword(encryptPassword);
+        boolean updateResult = this.updateById(user);
+        if (!updateResult) {
+            throw new BusinessException(ErrorCode.SYSTEM_ERROR, "密码更新失败");
+        }
+
+        // 6. 清理验证码相关key
+        try {
+            redisTemplate.delete("verify:code:" + email);
+            redisTemplate.delete("verify:fail:" + email);
+        } catch (Exception ignore) {
+        }
+
         return true;
     }
 
@@ -273,6 +373,22 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         QueryWrapper queryWrapper = new QueryWrapper();
         queryWrapper.eq("userAccount", userAccount);
         return this.getOne(queryWrapper);
+    }
+
+    /**
+     * 生成随机用户名
+     * 格式：user + 8位随机字母数字组合
+     *
+     * @return 随机用户名
+     */
+    private String generateRandomUsername() {
+        // 生成8位随机字符串（字母+数字）
+        String chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+        StringBuilder random = new StringBuilder();
+        for (int i = 0; i < 8; i++) {
+            random.append(chars.charAt(RandomUtil.randomInt(chars.length())));
+        }
+        return "user" + random.toString();
     }
 
 }

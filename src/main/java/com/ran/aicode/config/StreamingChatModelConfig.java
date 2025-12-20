@@ -8,6 +8,8 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Scope;
 
+import java.time.Duration;
+
 @Configuration
 @ConfigurationProperties(prefix = "langchain4j.open-ai.streaming-chat-model")
 @Data
@@ -27,17 +29,28 @@ public class StreamingChatModelConfig {
 
     private boolean logResponses;
 
+    /**
+     * 流式请求超时时间（毫秒）。用于底层 HTTP connect/read 超时。
+     * application-prod.yml: langchain4j.open-ai.streaming-chat-model.timeout-ms
+     */
+    private Long timeoutMs;
+
     @Bean
     @Scope("prototype")
     public StreamingChatModel streamingChatModelPrototype() {
-        return OpenAiStreamingChatModel.builder()
+        OpenAiStreamingChatModel.OpenAiStreamingChatModelBuilder builder = OpenAiStreamingChatModel.builder()
                 .apiKey(apiKey)
                 .baseUrl(baseUrl)
                 .modelName(modelName)
                 .maxTokens(maxTokens)
                 .temperature(temperature)
                 .logRequests(logRequests)
-                .logResponses(logResponses)
-                .build();
+                .logResponses(logResponses);
+
+        if (timeoutMs != null && timeoutMs > 0) {
+            builder.timeout(Duration.ofMillis(timeoutMs));
+        }
+
+        return builder.build();
     }
 }

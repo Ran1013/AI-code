@@ -29,7 +29,7 @@
             <a-tag color="green">管理员</a-tag>
           </div>
           <div v-else-if="record.userRole === 'member'">
-            <a-tag color="orange">会员</a-tag>
+            <a-tag color="orange">测试</a-tag>
           </div>
           <div v-else>
             <a-tag color="blue">普通用户</a-tag>
@@ -73,7 +73,7 @@
         <a-form-item label="用户角色">
           <a-select v-model:value="editForm.userRole" placeholder="请选择用户角色">
             <a-select-option value="user">普通用户</a-select-option>
-            <a-select-option value="member">会员</a-select-option>
+            <a-select-option value="member">测试</a-select-option>
             <a-select-option value="admin">管理员</a-select-option>
           </a-select>
         </a-form-item>

@@ -60,13 +60,23 @@ public class GlobalExceptionHandler {
         String accept = request.getHeader("Accept");
         String uri = request.getRequestURI();
         if ((accept != null && accept.contains("text/event-stream")) ||
-                uri.contains("/chat/gen/code")) {
+                uri.contains("/chat/gen/code") || uri.contains("/chat/code")) {
             try {
+                // 检查响应是否已提交，避免"getOutputStream() has already been called"错误
+                if (response.isCommitted()) {
+                    log.warn("响应已提交，跳过SSE错误写入: errorCode={}, message={}", errorCode, errorMessage);
+                    return true;
+                }
+
+                // 重置响应状态（如果可能）
+                response.reset();
+
                 // 设置SSE响应头
                 response.setContentType("text/event-stream");
                 response.setCharacterEncoding("UTF-8");
                 response.setHeader("Cache-Control", "no-cache");
                 response.setHeader("Connection", "keep-alive");
+
                 // 构造错误消息的SSE格式
                 Map<String, Object> errorData = Map.of(
                         "error", true,
@@ -74,18 +84,33 @@ public class GlobalExceptionHandler {
                         "message", errorMessage
                 );
                 String errorJson = JSONUtil.toJsonStr(errorData);
+
                 // 发送业务错误事件（避免与标准error事件冲突）
                 String sseData = "event: business-error\ndata: " + errorJson + "\n\n";
                 response.getWriter().write(sseData);
                 response.getWriter().flush();
+
                 // 发送结束事件
                 response.getWriter().write("event: done\ndata: {}\n\n");
                 response.getWriter().flush();
+
                 // 表示已处理SSE请求
                 return true;
             } catch (IOException ioException) {
-                log.error("Failed to write SSE error response", ioException);
-                // 即使写入失败，也表示这是SSE请求
+                // 检查是否是"getOutputStream() has already been called"错误
+                if (ioException.getMessage() != null &&
+                    ioException.getMessage().contains("getOutputStream() has already been called")) {
+                    log.warn("SSE输出流已被使用，跳过错误消息写入: errorCode={}, message={}", errorCode, errorMessage);
+                    return true;
+                } else {
+                    log.error("Failed to write SSE error response", ioException);
+                    // 即使写入失败，也表示这是SSE请求
+                    return true;
+                }
+            } catch (IllegalStateException e) {
+                // 处理reset()或其他状态相关的异常
+                log.warn("SSE响应状态异常，跳过错误写入: errorCode={}, message={}, error={}",
+                         errorCode, errorMessage, e.getMessage());
                 return true;
             }
         }

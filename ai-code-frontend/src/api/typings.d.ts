@@ -358,6 +358,8 @@ declare namespace API {
     userAvatar?: string
     userProfile?: string
     userRole?: string
+    totalTokens?: number
+    usedTokens?: number
     editTime?: string
     createTime?: string
     updateTime?: string
@@ -394,6 +396,7 @@ declare namespace API {
     userAccount?: string
     userPassword?: string
     checkPassword?: string
+    verifyCode?: string
   }
 
   type UserUpdateRequest = {

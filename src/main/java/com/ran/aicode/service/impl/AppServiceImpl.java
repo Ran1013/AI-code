@@ -24,6 +24,7 @@ import com.ran.aicode.model.entity.User;
 import com.ran.aicode.model.enums.*;
 import com.ran.aicode.model.vo.AppVO;
 import com.ran.aicode.service.*;
+import com.ran.aicode.service.TokenService;
 import com.jd.platform.hotkey.client.callback.JdHotKeyStore;
 import com.mybatisflex.core.query.QueryWrapper;
 import com.mybatisflex.spring.service.impl.ServiceImpl;
@@ -81,8 +82,12 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
     @Resource
     private AiCodeGeneratorServiceFactory aiCodeGeneratorServiceFactory;
 
+    @Resource
+    private TokenService tokenService;
+
+  
     @Override
-    public Flux<String> chatToGenCode(Long appId, String message, User loginUser, List<String> images) {
+    public Flux<String> chatToGenCode(Long appId, String message, User loginUser, List<String> images, boolean force) {
         // 1. 参数校验
         ThrowUtils.throwIf(appId == null || appId <= 0, ErrorCode.PARAMS_ERROR, "应用 ID 不能为空");
         ThrowUtils.throwIf(StrUtil.isBlank(message), ErrorCode.PARAMS_ERROR, "用户消息不能为空");
@@ -95,7 +100,17 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         if (!appUserService.hasAppPermission(appId, loginUser.getId())) {
             throw new BusinessException(ErrorCode.NO_AUTH_ERROR, "无权限访问该应用");
         }
-        // 4. 获取应用的代码生成类型
+        
+        // 4. 软拦截：管理员/测试跳过，普通用户进行余额估算校验
+        if (!tokenService.isAdminUser(loginUser.getId())) {
+            long estimatedTokens = estimateRequiredTokens(message, app.getCodeGenType());
+            long remaining = tokenService.getRemainingTokens(loginUser.getId());
+            if (remaining < estimatedTokens && !force) {
+                String msg = String.format("token 不足，需 ≥%d，当前剩余 %d，请联系管理员。", estimatedTokens, remaining);
+                throw new BusinessException(ErrorCode.TOKEN_INSUFFICIENT, msg);
+            }
+        }
+        // 5. 获取应用的代码生成类型
         String codeGenTypeStr = app.getCodeGenType();
         CodeGenTypeEnum codeGenTypeEnum = CodeGenTypeEnum.getEnumByValue(codeGenTypeStr);
         if (codeGenTypeEnum == null) {
@@ -103,24 +118,53 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         }
         log.info("chatToGenCode AI回复:  appId:{}", appId);
 
-        // 5. 构建包含图片的完整消息
+        // 6. 构建包含图片的完整消息
         String fullMessage = buildMessageWithImages(message, images);
 
-        // 6. 在调用 AI 前，先保存用户消息到数据库中
+        // 7. 在调用 AI 前，先保存用户消息到数据库中
         chatHistoryService.addChatMessage(appId, message, ChatHistoryMessageTypeEnum.USER.getValue(), loginUser.getId(), ChatHistoryStatusEnum.NORMAL.getValue(), images);
 
-        // 7. 调用 AI 生成代码（流式）
+        // 8. 调用 AI 生成代码（流式）
         Flux<String> codeStream;
-        if (loginUser.getUserRole().equals(UserRoleEnum.MEMBER.getValue())) {
-            //会员
+        String userRole = loginUser.getUserRole();
+        if (UserRoleEnum.MEMBER.getValue().equals(userRole) || UserRoleEnum.ADMIN.getValue().equals(userRole)) {
+            // 测试和管理员：走工作流（无限制）
             codeStream = new CodeGenConcurrentWorkflow().executeWorkflowWithFlux(fullMessage, appId, loginUser.getId());
+        } else if (codeGenTypeEnum == CodeGenTypeEnum.VUE_PROJECT) {
+            // 普通用户 + Vue：预占
+            long estimatedTokens = estimateRequiredTokens(message, app.getCodeGenType());
+            String reservationId = "vue-" + appId + "-" + loginUser.getId() + "-" + System.currentTimeMillis();
+            boolean reserved = tokenService.preConsume(loginUser.getId(), estimatedTokens, reservationId);
+            if (!reserved && !force) {
+                long remaining = tokenService.getRemainingTokens(loginUser.getId());
+                String msg = String.format("token 不足，需 ≥%d，当前剩余 %d，请联系管理员。", estimatedTokens, remaining);
+                throw new BusinessException(ErrorCode.TOKEN_INSUFFICIENT, msg);
+            }
+            codeStream = aiCodeGeneratorFacade.generateAndSaveCodeStreamWithReservation(fullMessage, codeGenTypeEnum, appId, loginUser.getId(), reservationId, estimatedTokens);
         } else {
-            //普通
+            // 普通用户 + 非 Vue：直接走统一入口（完成后按实际消费）
             codeStream = aiCodeGeneratorFacade.generateAndSaveCodeStream(fullMessage, codeGenTypeEnum, appId, loginUser.getId());
         }
         // 7. 收集 AI 响应的内容，并且在完成后保存记录到对话历史
         return streamHandlerExecutor.doExecute(codeStream, chatHistoryService, appId, loginUser, codeGenTypeEnum);
 
+    }
+
+    /**
+     * 基于配置估算本次生成所需 token（软拦截用）。
+     */
+    private long estimateRequiredTokens(String message, String codeGenType) {
+        // 默认值兜底（与 application-prod.yml 一致）
+        double base = 1200, multiplier = 1.0, bufferRate = 0.15;
+        if (CodeGenTypeEnum.MULTI_FILE.getValue().equals(codeGenType)) {
+            base = 6000; multiplier = 2.0; bufferRate = 0.15;
+        } else if (CodeGenTypeEnum.VUE_PROJECT.getValue().equals(codeGenType)) {
+            base = 15000; multiplier = 3.5; bufferRate = 0.2;
+        }
+        int promptLen = message != null ? message.length() : 0;
+        double estimate = base + (promptLen / 3.0) * multiplier;
+        estimate = Math.ceil(estimate * (1.0 + bufferRate));
+        return Math.max(100, (long) estimate);
     }
 
     /**
@@ -210,10 +254,13 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         updateApp.setDeployedTime(LocalDateTime.now());
         boolean updateResult = this.updateById(updateApp);
         ThrowUtils.throwIf(!updateResult, ErrorCode.OPERATION_ERROR, "更新应用部署信息失败");
-        // 10. 得到可访问的 URL 地址
+        // 10. 得到可访问的 URL 地址（对外短链：/{deployKey} -> 301 -> /example/static/{deployKey}/）
         String appDeployUrl = String.format("%s/%s", AppConstant.CODE_DEPLOY_HOST, deployKey);
         // 11. 异步生成截图并且更新应用封面
-        generateAppScreenshotAsync(appId, appDeployUrl);
+        // 说明：/inner/screenshot/{deployKey} 在当前工程中未实现，会导致 404（Whitelabel Error Page），截图内容错误。
+        // 这里直接对可访问的静态资源地址 /static/{deployKey}/ 进行截图。
+        String screenshotUrl = String.format("%s/static/%s/", AppConstant.CODE_DEPLOY_HOST, deployKey);
+        generateAppScreenshotAsync(appId, screenshotUrl);
         return appDeployUrl;
     }
 
@@ -227,14 +274,20 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
     public void generateAppScreenshotAsync(Long appId, String appUrl) {
         // 使用虚拟线程并执行
         Thread.startVirtualThread(() -> {
-            // 调用截图服务生成截图并上传
-            String screenshotUrl = screenshotService.generateAndUploadScreenshot(appUrl);
-            // 更新数据库的封面
-            App updateApp = new App();
-            updateApp.setId(appId);
-            updateApp.setCover(screenshotUrl);
-            boolean updated = this.updateById(updateApp);
-            ThrowUtils.throwIf(!updated, ErrorCode.OPERATION_ERROR, "更新应用封面字段失败");
+            try {
+                // 调用截图服务生成截图并上传
+                String screenshotUrl = screenshotService.generateAndUploadScreenshot(appUrl);
+                log.info("应用 {} 截图生成完成，截图URL：{}", appId, screenshotUrl);
+                // 更新数据库的封面
+                App updateApp = new App();
+                updateApp.setId(appId);
+                updateApp.setCover(screenshotUrl);
+                boolean updated = this.updateById(updateApp);
+                ThrowUtils.throwIf(!updated, ErrorCode.OPERATION_ERROR, "更新应用封面字段失败");
+                log.info("应用 {} 封面字段更新成功", appId);
+            } catch (Exception e) {
+                log.error("应用 {} 生成/更新封面失败，截图入口URL：{}", appId, appUrl, e);
+            }
         });
     }
 

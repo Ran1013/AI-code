@@ -50,13 +50,6 @@
   .footer-content {
     padding: 0 16px;
   }
-  
-  .footer-links {
-    gap: 12px;
-  }
-  
-  .footer-link {
-    font-size: 13px;
-  }
+
 }
 </style>
