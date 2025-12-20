@@ -88,11 +88,13 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
 
         // 4. 加密
         String encryptPassword = getEncryptPassword(userPassword);
-        // 5. 插入数据
+        // 5. 生成随机用户名
+        String randomUsername = generateRandomUsername();
+        // 6. 插入数据
         User user = new User();
         user.setUserAccount(userAccount);
         user.setUserPassword(encryptPassword);
-        user.setUserName(userAccount);
+        user.setUserName(randomUsername);
         user.setUserRole(UserRoleEnum.USER.getValue());
         user.setTotalTokens(150000L); // 新用户默认150000 token
         user.setUsedTokens(0L);
@@ -158,10 +160,10 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
             }
 
             if (user == null) {
-                // 不存在则自动创建用户（默认角色 user，昵称为邮箱）
+                // 不存在则自动创建用户（默认角色 user，随机用户名）
                 user = new User();
                 user.setUserAccount(userAccount);
-                user.setUserName(userAccount);
+                user.setUserName(generateRandomUsername());
                 user.setUserRole(UserRoleEnum.USER.getValue());
                 // 密码字段非空，写入随机占位密码（不可用于登录）
                 String placeholder = RandomUtil.randomString(16);
@@ -371,6 +373,22 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         QueryWrapper queryWrapper = new QueryWrapper();
         queryWrapper.eq("userAccount", userAccount);
         return this.getOne(queryWrapper);
+    }
+
+    /**
+     * 生成随机用户名
+     * 格式：user + 8位随机字母数字组合
+     *
+     * @return 随机用户名
+     */
+    private String generateRandomUsername() {
+        // 生成8位随机字符串（字母+数字）
+        String chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+        StringBuilder random = new StringBuilder();
+        for (int i = 0; i < 8; i++) {
+            random.append(chars.charAt(RandomUtil.randomInt(chars.length())));
+        }
+        return "user" + random.toString();
     }
 
 }
