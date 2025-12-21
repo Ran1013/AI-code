@@ -48,12 +48,10 @@ public class SaTokenRedisConfig implements WebMvcConfigurer {
                 .addExclude("/knife4j/**")
                 .addExclude("/inner/screenshot/**")
                 .addExclude("/static/**")
-                .addExclude("/admin/ai-model/**")
-                .addExclude("/test/model/**")
                 .setAuth(obj -> {
                     // 登录认证 -- 拦截所有路由，并排除 /user/login 等接口
                     SaRouter.match("/**")
-                            .notMatch("/user/sendVerify","/user/login", "/user/register", "/user/get/login", "/admin/ai-model/**")
+                            .notMatch("/user/sendVerify","/user/login", "/user/register", "/user/get/login")
                             .notMatch("/doc.html", "/webjars/**", "/swagger-resources/**", "/v3/api-docs/**")
                             .notMatch("/v3/api-docs/swagger-config")
                             .notMatch("/swagger-ui.html", "/swagger-ui/**", "/swagger-ui/index.html")
@@ -61,7 +59,6 @@ public class SaTokenRedisConfig implements WebMvcConfigurer {
                             .notMatch("/knife4j/**")
                             .notMatch("/inner/screenshot/**")
                             .notMatch("/static/**")
-                            .notMatch("/admin/ai-model/**", "/test/model/**")
                             .notMatch("/ws/**") // WebSocket 连接路径
                             .check(r -> StpUtil.checkLogin());
                 })
@@ -76,7 +73,7 @@ public class SaTokenRedisConfig implements WebMvcConfigurer {
                             .setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
                             .setHeader("Access-Control-Allow-Headers", "*")
                             .setHeader("Access-Control-Allow-Credentials", "true");
-                    
+
                     // 如果是预检请求，直接返回
                     if ("OPTIONS".equals(SaHolder.getRequest().getMethod())) {
                         SaRouter.stop();
