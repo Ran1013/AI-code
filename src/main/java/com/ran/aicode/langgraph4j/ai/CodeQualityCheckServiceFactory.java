@@ -14,7 +14,7 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class CodeQualityCheckServiceFactory {
 
-    @Resource(name = "openAiChatModel")
+    @Resource(name = "multiFallbackOpenAiChatModel")
     private ChatModel chatModel;
 
     /**
