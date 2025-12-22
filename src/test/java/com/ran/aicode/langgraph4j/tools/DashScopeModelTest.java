@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.TestPropertySource;
 import lombok.extern.slf4j.Slf4j;
+import com.ran.aicode.langgraph4j.model.ImageResource;
 
 import jakarta.annotation.Resource;
 import java.util.List;
