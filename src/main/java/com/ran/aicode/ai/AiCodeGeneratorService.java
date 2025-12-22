@@ -23,7 +23,7 @@ public interface AiCodeGeneratorService {
      * @param userMessage 用户消息
      * @return 生成的代码结果
      */
-    @SystemMessage(fromResource = "prompt/codegen-multi-file-system-prompt.txt")
+    @SystemMessage(fromResource = "prompt/codegen-multi-file-system-prompt-new.txt")
     MultiFileCodeResult generateMultiFileCode(String userMessage);
 
 
@@ -42,7 +42,7 @@ public interface AiCodeGeneratorService {
      * @param userMessage 用户消息
      * @return 生成的代码结果
      */
-    @SystemMessage(fromResource = "prompt/codegen-multi-file-system-prompt.txt")
+    @SystemMessage(fromResource = "prompt/codegen-multi-file-system-prompt-new.txt")
     TokenStream generateMultiFileCodeStream(@MemoryId long appId, @UserMessage String userMessage);
 
     /**

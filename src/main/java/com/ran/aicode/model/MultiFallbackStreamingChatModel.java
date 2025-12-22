@@ -2,6 +2,7 @@ package com.ran.aicode.model;
 
 import com.ran.aicode.config.StreamingChatModelConfig;
 import dev.langchain4j.model.chat.StreamingChatModel;
+import dev.langchain4j.model.chat.request.ChatRequest;
 import dev.langchain4j.model.chat.response.StreamingChatResponseHandler;
 import lombok.extern.slf4j.Slf4j;
 
@@ -67,39 +68,84 @@ public class MultiFallbackStreamingChatModel implements StreamingChatModel {
     }
 
     @Override
-    public void chat(String userMessage, StreamingChatResponseHandler handler) {
-        // 检查是否到了恢复时间
+    public void chat(ChatRequest chatRequest, StreamingChatResponseHandler handler) {
+        // 每次请求前检查是否到了恢复时间（是否可以尝试切回主模型）
         checkRecoveryTime();
 
         List<ModelLevel> levelsToTry = getLevelsToTry();
-        Exception lastException = null;
+        // 从第 0 个级别开始尝试
+        attemptChat(chatRequest, handler, levelsToTry, 0, null);
+    }
 
-        for (ModelLevel level : levelsToTry) {
-            try {
-                StreamingChatModel model = getModelByLevel(level);
-                if (model == null) {
-                    log.warn("模型 {} 未配置，跳过", level.getDesc());
-                    continue;
-                }
+    private void attemptChat(
+            ChatRequest chatRequest,
+            StreamingChatResponseHandler finalHandler,
+            List<ModelLevel> levelsToTry,
+            int index,
+            Exception lastException) {
 
-                log.debug("尝试使用模型: {}", level.getDesc());
-                model.chat(userMessage, handler);
+        // 所有模型都尝试完了，最终向调用方报告失败
+        if (index >= levelsToTry.size()) {
+            RuntimeException ex = new RuntimeException("所有AI模型都不可用", lastException);
+            finalHandler.onError(ex);
+            return;
+        }
 
-                // 成功则重置失败计数
+        ModelLevel level = levelsToTry.get(index);
+        StreamingChatModel model = getModelByLevel(level);
+        if (model == null) {
+            log.warn("模型 {} 未配置，跳过", level.getDesc());
+            // 继续尝试下一个级别
+            attemptChat(chatRequest, finalHandler, levelsToTry, index + 1, lastException);
+            return;
+        }
+
+        // 包装一层 handler，用来拦截 onError 做模型切换，其余事件原样转发
+        StreamingChatResponseHandler proxyHandler = new StreamingChatResponseHandler() {
+
+            @Override
+            public void onPartialResponse(String partialResponse) {
+                finalHandler.onPartialResponse(partialResponse);
+            }
+
+            @Override
+            public void onPartialToolExecutionRequest(
+                    int i,
+                    dev.langchain4j.agent.tool.ToolExecutionRequest partialToolExecutionRequest) {
+                finalHandler.onPartialToolExecutionRequest(i, partialToolExecutionRequest);
+            }
+
+            @Override
+            public void onCompleteToolExecutionRequest(
+                    int i,
+                    dev.langchain4j.agent.tool.ToolExecutionRequest completeToolExecutionRequest) {
+                finalHandler.onCompleteToolExecutionRequest(i, completeToolExecutionRequest);
+            }
+
+            @Override
+            public void onCompleteResponse(
+                    dev.langchain4j.model.chat.response.ChatResponse completeResponse) {
+                // 成功：重置失败计数
                 consecutiveFailures.set(0);
 
-                // 如果回到了主模型，记录恢复
+                // 如果是从备用模型切回主模型，记录一次恢复
                 if (level == ModelLevel.PRIMARY && currentLevel != ModelLevel.PRIMARY) {
                     logSwitch(level, "主模型恢复");
                     currentLevel = level;
                 }
 
-                return;
+                finalHandler.onCompleteResponse(completeResponse);
+            }
 
-            } catch (Exception e) {
-                lastException = e;
+            @Override
+            public void onError(Throwable error) {
+                Exception e = (error instanceof Exception)
+                        ? (Exception) error
+                        : new RuntimeException(error);
+
                 consecutiveFailures.incrementAndGet();
 
+                // 判断是否需要切换到下一个模型
                 if (shouldSwitchModel(e, level)) {
                     ModelLevel nextLevel = getNextLevel(level);
                     if (nextLevel != null) {
@@ -107,27 +153,29 @@ public class MultiFallbackStreamingChatModel implements StreamingChatModel {
                         currentLevel = nextLevel;
                         lastSwitchTime = System.currentTimeMillis();
 
-                        // 短暂延迟后重试
-                        if (level != levelsToTry.get(levelsToTry.size() - 1)) {
-                            try {
-                                Thread.sleep(100); // 100ms延迟
-                            } catch (InterruptedException ie) {
-                                Thread.currentThread().interrupt();
-                                break;
-                            }
-                        }
-                        continue;
+                        // 递归尝试下一个级别（注意 index + 1）
+                        attemptChat(chatRequest, finalHandler, levelsToTry, index + 1, e);
+                        return;
                     }
                 }
 
+                // 不需要或无法切换时，将错误传给最终 handler
                 log.warn("模型 {} 调用失败: {}", level.getDesc(), e.getMessage());
+                finalHandler.onError(error);
             }
-        }
+        };
 
-        throw new RuntimeException("所有AI模型都不可用", lastException);
+        try {
+            log.debug("尝试使用模型: {}", level.getDesc());
+            // 关键点：这里调用的是底层模型的 chat，而不是 doChat
+            // 这样会走 OpenAiStreamingChatModel 自己的 defaultRequestParameters + doChat 流程
+            model.chat(chatRequest, proxyHandler);
+        } catch (Exception e) {
+            // 同步异常（较少见），直接走和 onError 一样的逻辑
+            proxyHandler.onError(e);
+        }
     }
 
-  
     /**
      * 检查是否应该切换模型
      * 基于Codex的精准异常识别逻辑

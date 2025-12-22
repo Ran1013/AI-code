@@ -102,8 +102,7 @@ public class AiCodeGeneratorFacade {
                 yield generateHtmlWithRetryStream(aiCodeGeneratorService, userMessage, appId, userId);
             }
             case MULTI_FILE -> {
-                TokenStream tokenStream = aiCodeGeneratorService.generateMultiFileCodeStream(appId, userMessage);
-                yield processTokenStreamForSimpleText(tokenStream, appId, userId, CodeGenTypeEnum.MULTI_FILE);
+                yield generateMultiFileWithRetryStream(aiCodeGeneratorService, userMessage, appId, userId);
             }
             case VUE_PROJECT -> {
                 TokenStream tokenStream = aiCodeGeneratorService.generateVueProjectCodeStream(appId, userMessage);
@@ -238,6 +237,13 @@ public class AiCodeGeneratorFacade {
             "2) 代码必须包含 <!DOCTYPE html> 或 <html>，并且是完整可运行的单文件页面。\n" +
             "3) 代码块之外禁止输出任何解释、清单、说明文字。\n";
 
+    private static final String MULTI_FILE_RETRY_APPEND_PROMPT = "\n\n" +
+            "【严格输出要求 - 多文件模式】\n" +
+            "1) 必须严格输出 3 个代码块，顺序固定为：```html```、```css```、```javascript```。\n" +
+            "2) 每种语言只能有 1 个代码块，且代码块中必须包含完整文件内容。\n" +
+            "3) 代码块外可以有少量说明文字，但代码块标签必须严格是 ```html / ```css / ```javascript。\n" +
+            "4) 如果无法完全生成 CSS 或 JS，也要输出最小可运行的占位代码，HTML 代码块必须始终存在。\n";
+
     /**
      * HTML 模式：失败自动重试一次。
      */
@@ -332,6 +338,112 @@ public class AiCodeGeneratorFacade {
                     })
                     .onError((Throwable error) -> {
                         error.printStackTrace();
+                        generationTaskManager.completeTask(appId);
+                        sink.error(error);
+                    })
+                    .start();
+        });
+    }
+
+    /**
+     * MULTI_FILE 模式：失败自动重试一次。
+     */
+    private Flux<String> generateMultiFileWithRetryStream(
+            AiCodeGeneratorService aiCodeGeneratorService,
+            String userMessage,
+            Long appId,
+            Long userId) {
+
+        TokenStream first = aiCodeGeneratorService.generateMultiFileCodeStream(appId, userMessage);
+        return processMultiFileTokenStreamWithRetry(first, aiCodeGeneratorService, userMessage, appId, userId, false);
+    }
+
+    private Flux<String> processMultiFileTokenStreamWithRetry(TokenStream tokenStream,
+                                                               AiCodeGeneratorService aiCodeGeneratorService,
+                                                               String originalUserMessage,
+                                                               Long appId,
+                                                               Long userId,
+                                                               boolean isRetry) {
+        StringBuilder partialContentBuilder = new StringBuilder();
+        CodeGenTypeEnum codeGenType = CodeGenTypeEnum.MULTI_FILE;
+
+        return Flux.create((FluxSink<String> sink) -> {
+            Disposable disposable = Flux.never().subscribe();
+            generationTaskManager.registerTask(appId, codeGenType.getValue(), disposable, sink, userId, partialContentBuilder);
+
+            tokenStream.onPartialResponse((String partialResponse) -> {
+                        partialContentBuilder.append(partialResponse);
+                        sink.next(partialResponse);
+                    })
+                    .onPartialToolExecutionRequest((index, toolExecutionRequest) -> {
+                        log.debug("忽略工具调用请求: {}", toolExecutionRequest.name());
+                    })
+                    .onToolExecuted((ToolExecution toolExecution) -> {
+                        log.debug("忽略工具执行结果: {}", toolExecution.request().name());
+                    })
+                    .onCompleteResponse((ChatResponse response) -> {
+                        if (response == null) {
+                            log.warn("收到空的完整响应，跳过处理");
+                            generationTaskManager.completeTask(appId);
+                            sink.complete();
+                            return;
+                        }
+
+                        // 统计并更新用户token消耗（保持与原逻辑一致）
+                        try {
+                            dev.langchain4j.model.output.TokenUsage tokenUsage = response.metadata().tokenUsage();
+                            if (tokenUsage != null) {
+                                Long inputTokens = tokenUsage.inputTokenCount() != null ? tokenUsage.inputTokenCount() : 0L;
+                                Long outputTokens = tokenUsage.outputTokenCount() != null ? tokenUsage.outputTokenCount() : 0L;
+                                Long consumedTokens = inputTokens + outputTokens;
+                                if (consumedTokens > 0) {
+                                    boolean success = tokenService.consumeTokens(userId, consumedTokens);
+                                    if (success) {
+                                        log.info("用户 {} 消耗token成功，消耗: {}", userId, consumedTokens);
+                                    } else {
+                                        log.warn("用户 {} 消耗token失败，消耗: {}", userId, consumedTokens);
+                                    }
+                                }
+                            }
+                        } catch (Exception e) {
+                            log.error("统计用户token消耗失败: userId={}, error={}", userId, e.getMessage(), e);
+                        }
+
+                        String completeCode = partialContentBuilder.toString();
+                        if (completeCode != null && !completeCode.trim().isEmpty()) {
+                            try {
+                                Object parsedResult = CodeParserExecutor.executeParser(completeCode, codeGenType);
+                                File saveDir = CodeFileSaverExecutor.executeSaver(parsedResult, codeGenType, appId);
+                                log.info("保存成功，目录为：{}", saveDir.getAbsolutePath());
+
+                                generationTaskManager.completeTask(appId);
+                                sink.complete();
+                                return;
+                            } catch (BusinessException e) {
+                                if (!isRetry) {
+                                    log.warn("MULTI_FILE 解析失败，准备重试一次: appId={}, error={}", appId, e.getMessage());
+                                    generationTaskManager.completeTask(appId);
+
+                                    String retryMessage = originalUserMessage + MULTI_FILE_RETRY_APPEND_PROMPT;
+                                    TokenStream retryStream = aiCodeGeneratorService.generateMultiFileCodeStream(appId, retryMessage);
+
+                                    processMultiFileTokenStreamWithRetry(
+                                            retryStream, aiCodeGeneratorService,
+                                            originalUserMessage, appId, userId, true)
+                                            .subscribe(sink::next, sink::error, sink::complete);
+                                    return;
+                                }
+                                // 二次失败，再把错误透传
+                                generationTaskManager.completeTask(appId);
+                                sink.error(e);
+                                return;
+                            }
+                        }
+
+                        generationTaskManager.completeTask(appId);
+                        sink.complete();
+                    })
+                    .onError((Throwable error) -> {
                         generationTaskManager.completeTask(appId);
                         sink.error(error);
                     })

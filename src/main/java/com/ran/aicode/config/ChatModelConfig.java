@@ -48,7 +48,7 @@ public class ChatModelConfig {
     @Data
     public static class FallbackConfig {
         private Boolean enabled = false;
-        private Integer recoveryIntervalMinutes = 15;
+        private Integer recoveryIntervalMinutes = 30;  // 30 分钟后再尝试主模型
         private SecondaryConfig secondary;
         private TertiaryConfig tertiary;
         private MonitoringConfig monitoring = new MonitoringConfig();
@@ -121,7 +121,7 @@ public class ChatModelConfig {
         }
 
         return new MultiFallbackChatModel(
-                primary, secondary, tertiary);
+                primary, secondary, tertiary, fallbacks);
     }
 
     private ChatModel createPrimaryModel() {

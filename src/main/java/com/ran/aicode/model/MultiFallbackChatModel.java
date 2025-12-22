@@ -21,6 +21,7 @@ public class MultiFallbackChatModel implements ChatModel {
     private final ChatModel primaryModel;
     private final ChatModel secondaryModel;
     private final ChatModel tertiaryModel;
+    private final ChatModelConfig.FallbackConfig config;
 
     // 当前使用的模型级别
     private volatile MultiFallbackStreamingChatModel.ModelLevel currentLevel = MultiFallbackStreamingChatModel.ModelLevel.PRIMARY;
@@ -33,10 +34,12 @@ public class MultiFallbackChatModel implements ChatModel {
     public MultiFallbackChatModel(
             ChatModel primaryModel,
             ChatModel secondaryModel,
-            ChatModel tertiaryModel) {
+            ChatModel tertiaryModel,
+            ChatModelConfig.FallbackConfig config) {
         this.primaryModel = primaryModel;
         this.secondaryModel = secondaryModel;
         this.tertiaryModel = tertiaryModel;
+        this.config = config;
 
         log.info("多级备用ChatModel初始化完成 - 主: {}, 次级: {}, 终极: {}",
                 primaryModel != null ? "启用" : "未启用",
@@ -46,31 +49,159 @@ public class MultiFallbackChatModel implements ChatModel {
 
     @Override
     public ChatResponse chat(ChatRequest chatRequest) {
-        // 对于非流式调用，简单使用主模型
-        try {
-            return primaryModel.chat(chatRequest);
-        } catch (Exception e) {
-            log.warn("非流式调用失败，尝试使用备用模型: {}", e.getMessage());
+        checkRecoveryTime();
+        List<MultiFallbackStreamingChatModel.ModelLevel> levelsToTry = getLevelsToTry();
+        Exception lastException = null;
 
-            // 尝试次级备用
-            if (secondaryModel != null) {
-                try {
-                    return secondaryModel.chat(chatRequest);
-                } catch (Exception e2) {
-                    log.warn("次级备用模型也失败: {}", e2.getMessage());
+        for (MultiFallbackStreamingChatModel.ModelLevel level : levelsToTry) {
+            try {
+                ChatModel model = getModelByLevel(level);
+                if (model == null) {
+                    log.warn("模型 {} 未配置，跳过", level.getDesc());
+                    continue;
                 }
-            }
 
-            // 尝试终极备用
-            if (tertiaryModel != null) {
-                try {
-                    return tertiaryModel.chat(chatRequest);
-                } catch (Exception e3) {
-                    log.warn("终极备用模型也失败: {}", e3.getMessage());
+                ChatResponse response = model.chat(chatRequest);
+                consecutiveFailures.set(0);
+
+                if (level == MultiFallbackStreamingChatModel.ModelLevel.PRIMARY && currentLevel != MultiFallbackStreamingChatModel.ModelLevel.PRIMARY) {
+                    logSwitch(level, "主模型恢复");
+                    currentLevel = level;
                 }
-            }
+                return response;
 
-                throw new RuntimeException("所有AI模型都不可用", e);
+            } catch (Exception e) {
+                lastException = e;
+                consecutiveFailures.incrementAndGet();
+
+                if (shouldSwitchModel(e, level)) {
+                    MultiFallbackStreamingChatModel.ModelLevel nextLevel = getNextLevel(level);
+                    if (nextLevel != null) {
+                        logSwitch(nextLevel, e.getMessage());
+                        currentLevel = nextLevel;
+                        lastSwitchTime = System.currentTimeMillis();
+                        continue;
+                    }
+                }
+                log.warn("模型 {} 调用失败: {}", level.getDesc(), e.getMessage());
+            }
+        }
+        throw new RuntimeException("所有AI模型都不可用", lastException);
+    }
+
+    private void checkRecoveryTime() {
+        if (currentLevel == MultiFallbackStreamingChatModel.ModelLevel.PRIMARY) {
+            return;
+        }
+
+        long timeSinceSwitch = System.currentTimeMillis() - lastSwitchTime;
+        long recoveryIntervalMs = config.getRecoveryIntervalMinutes() * 60 * 1000L;
+
+        if (timeSinceSwitch >= recoveryIntervalMs) {
+            log.info("达到恢复间隔{}分钟，尝试切换回主模型", config.getRecoveryIntervalMinutes());
+            currentLevel = MultiFallbackStreamingChatModel.ModelLevel.PRIMARY;
+        }
+    }
+
+    private List<MultiFallbackStreamingChatModel.ModelLevel> getLevelsToTry() {
+        List<MultiFallbackStreamingChatModel.ModelLevel> levels = new ArrayList<>();
+        levels.add(currentLevel);
+
+        // 总是尝试主模型（如果当前不是主模型）
+        if (currentLevel != MultiFallbackStreamingChatModel.ModelLevel.PRIMARY) {
+            levels.add(MultiFallbackStreamingChatModel.ModelLevel.PRIMARY);
+        }
+
+        // 添加其他可用的备用模型
+        if (currentLevel != MultiFallbackStreamingChatModel.ModelLevel.SECONDARY &&
+            config.getSecondary() != null && config.getSecondary().getEnabled()) {
+            levels.add(MultiFallbackStreamingChatModel.ModelLevel.SECONDARY);
+        }
+
+        if (currentLevel != MultiFallbackStreamingChatModel.ModelLevel.TERTIARY &&
+            config.getTertiary() != null && config.getTertiary().getEnabled()) {
+            levels.add(MultiFallbackStreamingChatModel.ModelLevel.TERTIARY);
+        }
+
+        return levels;
+    }
+
+    private boolean shouldSwitchModel(Exception e, MultiFallbackStreamingChatModel.ModelLevel currentLevel) {
+        if (!config.getEnabled()) {
+            return false;
+        }
+
+        // 如果已经是终极备用，不能再切换了
+        if (currentLevel == MultiFallbackStreamingChatModel.ModelLevel.TERTIARY) {
+            return false;
+        }
+
+        String errorMessage = e.getMessage().toLowerCase();
+
+        // HTTP状态码判断
+        if (e.getMessage() != null) {
+            String msg = e.getMessage().toLowerCase();
+            if (msg.contains("402") || msg.contains("401")) {
+                log.info("检测到额度或认证问题，触发模型切换");
+                return true; // 额度或认证问题
+            }
+            if (msg.contains("429")) {
+                log.info("检测到请求频率限制，触发模型切换");
+                return true; // 频率限制
+            }
+            if (msg.contains("500") || msg.contains("502") || msg.contains("503") || msg.contains("504")) {
+                log.info("检测到服务器错误，触发模型切换");
+                return true; // 服务器错误
+            }
+        }
+
+        // 网络超时或连接错误
+        if (e.getCause() != null &&
+            (e.getCause() instanceof java.net.SocketTimeoutException ||
+             e.getCause() instanceof java.net.ConnectException ||
+             e.getCause() instanceof java.net.UnknownHostException)) {
+            log.info("检测到网络错误，触发模型切换");
+            return true;
+        }
+
+        // 连续失败次数超过阈值
+        if (consecutiveFailures.get() >= 3) {
+            log.info("连续失败{}次，触发模型切换", consecutiveFailures.get());
+            return true;
+        }
+
+        return false;
+    }
+
+    private MultiFallbackStreamingChatModel.ModelLevel getNextLevel(MultiFallbackStreamingChatModel.ModelLevel currentLevel) {
+        return switch (currentLevel) {
+            case PRIMARY -> config.getSecondary() != null && config.getSecondary().getEnabled()
+                    ? MultiFallbackStreamingChatModel.ModelLevel.SECONDARY : null;
+            case SECONDARY -> config.getTertiary() != null && config.getTertiary().getEnabled()
+                    ? MultiFallbackStreamingChatModel.ModelLevel.TERTIARY : null;
+            case TERTIARY -> null; // 没有更多备用了
+        };
+    }
+
+    private ChatModel getModelByLevel(MultiFallbackStreamingChatModel.ModelLevel level) {
+        return switch (level) {
+            case PRIMARY -> primaryModel;
+            case SECONDARY -> secondaryModel;
+            case TERTIARY -> tertiaryModel;
+        };
+    }
+
+    private void logSwitch(MultiFallbackStreamingChatModel.ModelLevel newLevel, String reason) {
+        long totalSwitches = switchCount.incrementAndGet();
+        log.info("模型切换: {} -> {}, 总次数: {}, 原因: {}",
+                currentLevel.getDesc(), newLevel.getDesc(), totalSwitches, reason);
+
+        // 触发告警（如果切换频繁）
+        if (config.getMonitoring().getEnabled() &&
+            totalSwitches >= config.getMonitoring().getSwitchAlertThreshold()) {
+            log.warn("模型切换频繁警告：已切换{}次，阈值{}",
+                    totalSwitches, config.getMonitoring().getSwitchAlertThreshold());
+            // TODO: 发送告警通知
         }
     }
 
