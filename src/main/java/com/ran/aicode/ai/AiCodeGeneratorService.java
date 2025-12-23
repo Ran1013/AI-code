@@ -14,7 +14,7 @@ public interface AiCodeGeneratorService {
      * @param userMessage 用户消息
      * @return 生成的代码结果
      */
-    @SystemMessage(fromResource = "prompt/codegen-html-system-prompt.txt")
+    @SystemMessage(fromResource = "prompt/codegen-html-system-prompt-new.txt")
     HtmlCodeResult generateHtmlCode(String userMessage);
 
     /**
@@ -33,7 +33,7 @@ public interface AiCodeGeneratorService {
      * @param userMessage 用户消息
      * @return 生成的代码结果
      */
-    @SystemMessage(fromResource = "prompt/codegen-html-system-prompt.txt")
+    @SystemMessage(fromResource = "prompt/codegen-html-system-prompt-new.txt")
     TokenStream generateHtmlCodeStream(@MemoryId long appId, @UserMessage String userMessage);
 
     /**

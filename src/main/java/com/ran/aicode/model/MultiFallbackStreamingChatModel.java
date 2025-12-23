@@ -42,6 +42,7 @@ public class MultiFallbackStreamingChatModel implements StreamingChatModel {
     private final StreamingChatModel secondaryModel;
     private final StreamingChatModel tertiaryModel;
     private final StreamingChatModelConfig.FallbackConfig config;
+    private final String primaryModelName; // 保存主模型名称
 
     // 当前使用的模型级别
     private volatile ModelLevel currentLevel = ModelLevel.PRIMARY;
@@ -60,6 +61,7 @@ public class MultiFallbackStreamingChatModel implements StreamingChatModel {
         this.secondaryModel = secondaryModel;
         this.tertiaryModel = tertiaryModel;
         this.config = config;
+        this.primaryModelName = config.getModelName(); // 保存主模型名称
 
         log.info("多级备用模型初始化完成 - 主: {}, 次级: {}, 终极: {}",
                 primaryModel != null ? "启用" : "未启用",
@@ -299,8 +301,12 @@ public class MultiFallbackStreamingChatModel implements StreamingChatModel {
      */
     private void logSwitch(ModelLevel newLevel, String reason) {
         long totalSwitches = switchCount.incrementAndGet();
-        log.info("模型切换: {} -> {}, 总次数: {}, 原因: {}",
-                currentLevel.getDesc(), newLevel.getDesc(), totalSwitches, reason);
+
+        // 获取目标模型的名称
+        String targetModelName = getModelName(newLevel);
+
+        log.info("模型切换: {} -> {}, 模型名称: {}, 总次数: {}, 原因: {}",
+                currentLevel.getDesc(), newLevel.getDesc(), targetModelName, totalSwitches, reason);
 
         // 触发告警（如果切换频繁）
         if (config.getMonitoring().getEnabled() &&
@@ -308,6 +314,24 @@ public class MultiFallbackStreamingChatModel implements StreamingChatModel {
             log.warn("模型切换频繁警告：已切换{}次，阈值{}",
                     totalSwitches, config.getMonitoring().getSwitchAlertThreshold());
             // TODO: 发送告警通知
+        }
+    }
+
+    /**
+     * 获取指定级别模型的名称
+     */
+  private String getModelName(ModelLevel level) {
+        switch (level) {
+            case PRIMARY:
+                return primaryModelName != null ? primaryModelName : "主模型";
+            case SECONDARY:
+                return config.getSecondary() != null && config.getSecondary().getModelName() != null
+                        ? config.getSecondary().getModelName() : "次级备用";
+            case TERTIARY:
+                return config.getTertiary() != null && config.getTertiary().getModelName() != null
+                        ? config.getTertiary().getModelName() : "终极备用";
+            default:
+                return "未知模型";
         }
     }
 
