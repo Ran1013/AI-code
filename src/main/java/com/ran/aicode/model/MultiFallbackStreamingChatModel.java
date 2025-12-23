@@ -42,7 +42,7 @@ public class MultiFallbackStreamingChatModel implements StreamingChatModel {
     private final StreamingChatModel secondaryModel;
     private final StreamingChatModel tertiaryModel;
     private final StreamingChatModelConfig.FallbackConfig config;
-    private final String primaryModelName; // 保存主模型名称
+    private final String primaryModelName;
 
     // 当前使用的模型级别
     private volatile ModelLevel currentLevel = ModelLevel.PRIMARY;
@@ -56,12 +56,13 @@ public class MultiFallbackStreamingChatModel implements StreamingChatModel {
             StreamingChatModel primaryModel,
             StreamingChatModel secondaryModel,
             StreamingChatModel tertiaryModel,
-            StreamingChatModelConfig.FallbackConfig config) {
+            StreamingChatModelConfig.FallbackConfig config,
+            String primaryModelName) {
         this.primaryModel = primaryModel;
         this.secondaryModel = secondaryModel;
         this.tertiaryModel = tertiaryModel;
         this.config = config;
-        this.primaryModelName = config.getModelName(); // 保存主模型名称
+        this.primaryModelName = primaryModelName;
 
         log.info("多级备用模型初始化完成 - 主: {}, 次级: {}, 终极: {}",
                 primaryModel != null ? "启用" : "未启用",
@@ -226,6 +227,23 @@ public class MultiFallbackStreamingChatModel implements StreamingChatModel {
         for (String keyword : quotaKeywords) {
             if (errorMessage.contains(keyword)) {
                 log.info("检测到额度相关关键词: {}，触发模型切换", keyword);
+                return true;
+            }
+        }
+
+        // 模型不可用错误检测 - 模型被删除、不存在或不支持
+        String[] modelUnavailableKeywords = {
+            "no provider", "no provider supported",
+            "not supported", "does not support",
+            "not found", "model not found",
+            "invalid model", "invalid model id",
+            "model not available", "unavailable",
+            "does not exist", "not exist"
+        };
+
+        for (String keyword : modelUnavailableKeywords) {
+            if (errorMessage.contains(keyword)) {
+                log.info("检测到模型不可用关键词: {}，触发模型切换", keyword);
                 return true;
             }
         }

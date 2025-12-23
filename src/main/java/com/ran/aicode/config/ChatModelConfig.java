@@ -121,7 +121,7 @@ public class ChatModelConfig {
         }
 
         return new MultiFallbackChatModel(
-                primary, secondary, tertiary, fallbacks);
+                primary, secondary, tertiary, fallbacks, modelName);
     }
 
     private ChatModel createPrimaryModel() {

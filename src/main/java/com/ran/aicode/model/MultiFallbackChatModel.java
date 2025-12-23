@@ -22,7 +22,7 @@ public class MultiFallbackChatModel implements ChatModel {
     private final ChatModel secondaryModel;
     private final ChatModel tertiaryModel;
     private final ChatModelConfig.FallbackConfig config;
-    private final String primaryModelName; // 保存主模型名称
+    private final String primaryModelName;
 
     // 当前使用的模型级别
     private volatile MultiFallbackStreamingChatModel.ModelLevel currentLevel = MultiFallbackStreamingChatModel.ModelLevel.PRIMARY;
@@ -36,12 +36,13 @@ public class MultiFallbackChatModel implements ChatModel {
             ChatModel primaryModel,
             ChatModel secondaryModel,
             ChatModel tertiaryModel,
-            ChatModelConfig.FallbackConfig config) {
+            ChatModelConfig.FallbackConfig config,
+            String primaryModelName) {
         this.primaryModel = primaryModel;
         this.secondaryModel = secondaryModel;
         this.tertiaryModel = tertiaryModel;
         this.config = config;
-        this.primaryModelName = config.getModelName(); // 保存主模型名称
+        this.primaryModelName = primaryModelName;
 
         log.info("多级备用ChatModel初始化完成 - 主: {}, 次级: {}, 终极: {}",
                 primaryModel != null ? "启用" : "未启用",
@@ -169,6 +170,23 @@ public class MultiFallbackChatModel implements ChatModel {
              e.getCause() instanceof java.net.UnknownHostException)) {
             log.info("检测到网络错误，触发模型切换");
             return true;
+        }
+
+        // 模型不可用错误检测 - 模型被删除、不存在或不支持
+        String[] modelUnavailableKeywords = {
+            "no provider", "no provider supported",
+            "not supported", "does not support",
+            "not found", "model not found",
+            "invalid model", "invalid model id",
+            "model not available", "unavailable",
+            "does not exist", "not exist"
+        };
+
+        for (String keyword : modelUnavailableKeywords) {
+            if (errorMessage.contains(keyword)) {
+                log.info("检测到模型不可用关键词: {}，触发模型切换", keyword);
+                return true;
+            }
         }
 
         // 连续失败次数超过阈值

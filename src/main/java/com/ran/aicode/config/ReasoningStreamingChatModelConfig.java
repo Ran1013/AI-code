@@ -42,7 +42,7 @@ public class ReasoningStreamingChatModelConfig {
         }
         StreamingChatModel secondary = createSecondaryModel();
         StreamingChatModel tertiary = createTertiaryModel();
-        return new MultiFallbackStreamingChatModel(primary, secondary, tertiary, fallbacks);
+        return new MultiFallbackStreamingChatModel(primary, secondary, tertiary, fallbacks, modelName);
     }
 
     private StreamingChatModel createPrimaryModel() {
