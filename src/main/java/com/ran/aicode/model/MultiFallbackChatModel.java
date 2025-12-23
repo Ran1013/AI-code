@@ -145,6 +145,11 @@ public class MultiFallbackChatModel implements ChatModel {
                 log.info("检测到额度或认证问题，触发模型切换");
                 return true; // 额度或认证问题
             }
+            // 认证失败关键词检测
+            if (msg.contains("authentication") || msg.contains("auth") || msg.contains("token")) {
+                log.info("检测到认证失败关键词，触发模型切换");
+                return true;
+            }
             if (msg.contains("429")) {
                 log.info("检测到请求频率限制，触发模型切换");
                 return true; // 频率限制

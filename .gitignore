@@ -5,7 +5,9 @@
 ### CUSTOM ###
 tmp
 application-prod.yml
-
+application-h.yml
+application-h2.yml
+application-prod123.yml
 # User-specific stuff
 .idea/**/workspace.xml
 .idea/**/tasks.xml
@@ -86,6 +88,7 @@ fabric.properties
 /.vscode/
 /target/
 node_modules/
-!/.claude/
-!/ai-code-frontend/dist/
-!/ai-code-frontend/node_modules/
+/.claude/
+/ai-code-frontend/dist/
+/ai-code-frontend/node_modules/
+
