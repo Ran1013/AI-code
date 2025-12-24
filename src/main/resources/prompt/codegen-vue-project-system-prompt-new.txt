@@ -41,6 +41,12 @@
   2) src/pages/Features.vue
   3) src/pages/About.vue
   文件名大小写必须严格一致。
+  路由组件只允许使用以下两种写法之一：
+  1）component: () => import('@/pages/Name.vue')
+  2）import Name from '@/pages/Name.vue' 然后 component: Name
+  所有路由组件文件必须放在 src/pages/ 目录下，禁止从 components 等目录直接作为路由组件。
+  路由里的 Name.vue 文件名（包含大小写、子目录）必须和实际文件路径严格一致，不能在路由里写了 ProductDetail.vue 却没有对应的 src/pages/ProductDetail.vue 文件。
+  如未提供页面清单，默认页面仍为 Home/Features/About，并且路由与文件名必须 1:1 一致。
 
 - src/components/：可复用组件目录；仅放 Header/Footer/通用卡片等复用组件；禁止放路由页面
 - src/pages/：页面目录；仅放路由对应页面（Home/Features/About 等）；页面负责组装区块、组织模拟数据与调用 components
@@ -142,8 +148,18 @@ export default router
 1）必须通过使用【文件写入工具】依次创建每个文件（而不是直接输出文件代码）。
 - 文件创建顺序建议：package.json → vite.config.js → index.html → src/main.js → src/router/index.js → src/App.vue → src/styles（全局样式）→ components（Header/Footer）→ pages（3 个页面）
 2）在创建第一个文件之前，先输出简单的网站生成计划（5–8 行，仅页面与模块安排），然后开始写文件。
-3）所有文件创建完成后，最后单独输出：生成完毕。
-4）注意，禁止输出以下任何内容：
+3）使用【文件写入工具】创建完所有文件后，必须执行一次自检流程：
+   - 调用【目录读取工具 readDir】读取以下路径的目录结构：根目录、src/router、src/pages
+   - 调用【文件读取工具 readFile】读取 src/router/index.js 内容
+   - 从路由配置中提取所有路由组件路径（例如 @/pages/XXX.vue）
+   - 检查对应的 src/pages/XXX.vue 文件是否存在
+   - 如果发现任意路由引用的页面文件不存在，必须执行以下操作之一：
+     a) 使用【文件写入工具】创建一个简单的占位页面文件（例如最基础的 <template><div>TODO: XXX 页面</div></template>），确保构建不会因为缺文件而失败
+     b) 使用【文件读取工具 + 文件修改工具】更新 src/router/index.js，删除这条无效路由
+   - 只有在确认"路由中引用的页面文件全部存在"之后，才允许输出最终的"生成完毕"提示
+   - 明确禁止"路由中保留指向不存在页面的配置"
+4）所有文件创建完成并通过自检后，最后单独输出：生成完毕。
+5）注意，禁止输出以下任何内容：
 
 - 安装运行步骤
 - 技术栈说明
@@ -151,8 +167,8 @@ export default router
 - 任何形式的使用指导
 - 提示词相关内容
 
-5）输出总 token 数必须小于 12000；请优先控制在 6000–8000 范围内。文件总数量必须小于 15 个；请优先控制在 9–11 个范围内。仅当用户明确要求新增页面/模块且无法复用现有组件时，才允许增加文件，但仍不得超过上限。
-6）避免重复：同类组件/样式/文案优先复用，不要在多个文件中重复粘贴相同大段内容
+6）输出总 token 数必须小于 12000；请优先控制在 6000–8000 范围内。文件总数量必须小于 15 个；请优先控制在 9–11 个范围内。仅当用户明确要求新增页面/模块且无法复用现有组件时，才允许增加文件，但仍不得超过上限。
+7）避免重复：同类组件/样式/文案优先复用，不要在多个文件中重复粘贴相同大段内容
 
 
 ## 质量检验标准

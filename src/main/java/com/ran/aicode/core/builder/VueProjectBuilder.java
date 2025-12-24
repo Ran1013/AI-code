@@ -156,6 +156,12 @@ public class VueProjectBuilder {
 
         log.info("开始构建 Vue 项目：{}", projectPath);
 
+        // 结构校验（在构建前检查关键文件和路由-页面一致性）
+        if (!validateProjectStructure(projectDir)) {
+            log.error("Vue 项目结构校验失败，终止构建: {}", projectPath);
+            return false;
+        }
+
         // 智能清理构建文件
         smartCleanupBuildFiles(projectDir);
 
@@ -429,6 +435,213 @@ public class VueProjectBuilder {
                 }
             }
             directory.delete();
+        }
+    }
+
+    /**
+     * 校验 Vue 项目基本结构（并视情况自动补救）
+     * 返回 true 表示可以进入构建阶段；false 表示结构问题严重，直接终止构建。
+     *
+     * @param projectDir 项目目录
+     * @return 是否通过校验
+     */
+    private boolean validateProjectStructure(File projectDir) {
+        log.info("开始校验 Vue 项目结构: {}", projectDir.getAbsolutePath());
+
+        // 1. 检查关键文件/目录是否存在
+        File packageJsonFile = new File(projectDir, "package.json");
+        File srcMainFile = new File(projectDir, "src/main.js");
+        File srcMainTsFile = new File(projectDir, "src/main.ts");
+        File appVueFile = new File(projectDir, "src/App.vue");
+        File routerIndexJs = new File(projectDir, "src/router/index.js");
+        File routerIndexTs = new File(projectDir, "src/router/index.ts");
+        File pagesDir = new File(projectDir, "src/pages");
+
+        if (!packageJsonFile.exists()) {
+            log.error("缺少关键文件: package.json");
+            return false;
+        }
+
+        boolean hasMainJs = srcMainFile.exists() || srcMainTsFile.exists();
+        if (!hasMainJs) {
+            log.error("缺少关键文件: src/main.js 或 src/main.ts");
+            return false;
+        }
+
+        if (!appVueFile.exists()) {
+            log.error("缺少关键文件: src/App.vue");
+            return false;
+        }
+
+        boolean hasRouter = routerIndexJs.exists() || routerIndexTs.exists();
+        if (!hasRouter) {
+            log.error("缺少关键文件: src/router/index.js 或 src/router/index.ts");
+            return false;
+        }
+
+        if (!pagesDir.exists() || !pagesDir.isDirectory()) {
+            log.error("缺少关键目录: src/pages");
+            return false;
+        }
+
+        // 2. 校验"路由–页面一致性"
+        File routerFile = routerIndexJs.exists() ? routerIndexJs : routerIndexTs;
+        try {
+            String routerContent = java.nio.file.Files.readString(routerFile.toPath());
+            if (routerContent == null || routerContent.isEmpty()) {
+                log.warn("路由文件内容为空: {}", routerFile.getAbsolutePath());
+                return true; // 允许构建，可能是空项目
+            }
+
+            // 解析路由组件路径
+            java.util.Set<String> routeComponentPaths = extractRouteComponentPaths(routerContent);
+            log.info("从路由文件中解析到 {} 个路由组件路径", routeComponentPaths.size());
+
+            // 检查对应的页面文件是否存在
+            java.util.List<String> missingFiles = new java.util.ArrayList<>();
+            for (String componentPath : routeComponentPaths) {
+                // 将 @/pages/XXX.vue 转换为 src/pages/XXX.vue
+                String relativePath = componentPath.replace("@/pages/", "src/pages/");
+                File pageFile = new File(projectDir, relativePath);
+                if (!pageFile.exists()) {
+                    missingFiles.add(relativePath);
+                }
+            }
+
+            if (!missingFiles.isEmpty()) {
+                log.warn("检测到 {} 个缺失的页面文件: {}", missingFiles.size(), missingFiles);
+
+                // 3. 对缺失的页面文件执行"自动补救"
+                if (missingFiles.size() >= 5) {
+                    log.error("缺失文件数量过多（{}），自动补救失败，终止构建", missingFiles.size());
+                    return false;
+                }
+
+                boolean allRemedied = true;
+                for (String missingFile : missingFiles) {
+                    // 从路径中提取页面名称（如 src/pages/ProductDetail.vue -> ProductDetail）
+                    String fileName = new File(missingFile).getName();
+                    String pageName = fileName.substring(0, fileName.lastIndexOf('.'));
+                    String routePath = missingFile.replace("src/pages/", "/").replace(".vue", "");
+
+                    log.info("自动创建占位页面: {} (路由: {})", missingFile, routePath);
+                    if (!createPlaceholderPage(projectDir, missingFile, pageName)) {
+                        log.error("创建占位页面失败: {}", missingFile);
+                        allRemedied = false;
+                    }
+                }
+
+                if (allRemedied) {
+                    log.info("已自动创建 {} 个占位页面，构建将继续", missingFiles.size());
+                } else {
+                    log.error("部分占位页面创建失败，终止构建");
+                    return false;
+                }
+            }
+
+        } catch (IOException e) {
+            log.error("读取路由文件失败: {}, 错误: {}", routerFile.getAbsolutePath(), e.getMessage(), e);
+            return false;
+        }
+
+        log.info("Vue 项目结构校验通过");
+        return true;
+    }
+
+    /**
+     * 从路由文件内容中提取所有路由组件路径
+     * 支持动态 import 和静态 import 两种形式
+     *
+     * @param routerContent 路由文件内容
+     * @return 路由组件路径集合（如 @/pages/Home.vue）
+     */
+    private java.util.Set<String> extractRouteComponentPaths(String routerContent) {
+        java.util.Set<String> paths = new java.util.HashSet<>();
+
+        // 匹配动态 import: component: () => import('@/pages/XXX.vue')
+        java.util.regex.Pattern dynamicPattern = java.util.regex.Pattern.compile(
+                "import\\(['\"](@/pages/[^'\"]+)['\"]\\)",
+                java.util.regex.Pattern.DOTALL
+        );
+        java.util.regex.Matcher dynamicMatcher = dynamicPattern.matcher(routerContent);
+        while (dynamicMatcher.find()) {
+            paths.add(dynamicMatcher.group(1));
+        }
+
+        // 匹配静态 import: import XXX from '@/pages/XXX.vue'
+        java.util.regex.Pattern staticPattern = java.util.regex.Pattern.compile(
+                "import\\s+\\w+\\s+from\\s+['\"](@/pages/[^'\"]+)['\"]",
+                java.util.regex.Pattern.DOTALL
+        );
+        java.util.regex.Matcher staticMatcher = staticPattern.matcher(routerContent);
+        while (staticMatcher.find()) {
+            paths.add(staticMatcher.group(1));
+        }
+
+        return paths;
+    }
+
+    /**
+     * 创建占位页面文件
+     *
+     * @param projectDir 项目目录
+     * @param relativePath 相对路径（如 src/pages/ProductDetail.vue）
+     * @param pageName 页面名称
+     * @return 是否创建成功
+     */
+    private boolean createPlaceholderPage(File projectDir, String relativePath, String pageName) {
+        try {
+            File pageFile = new File(projectDir, relativePath);
+            File parentDir = pageFile.getParentFile();
+
+            // 确保父目录存在
+            if (parentDir != null && !parentDir.exists()) {
+                java.nio.file.Files.createDirectories(parentDir.toPath());
+            }
+
+            String content = String.format("""
+<template>
+  <div class="page-placeholder">
+    <h1>%s 页面</h1>
+    <p>此页面为自动生成的占位内容</p>
+  </div>
+</template>
+
+<script setup>
+const title = '%s 页面'
+</script>
+
+<style scoped>
+.page-placeholder {
+  padding: 40px;
+  text-align: center;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.page-placeholder h1 {
+  font-size: 32px;
+  color: #333;
+  margin-bottom: 16px;
+}
+
+.page-placeholder p {
+  font-size: 16px;
+  color: #666;
+}
+</style>
+""", pageName, pageName);
+
+            java.nio.file.Files.writeString(pageFile.toPath(), content, java.nio.charset.StandardCharsets.UTF_8);
+            log.info("成功创建占位页面: {}", pageFile.getAbsolutePath());
+            return true;
+
+        } catch (IOException e) {
+            log.error("创建占位页面失败: {}, 错误: {}", relativePath, e.getMessage(), e);
+            return false;
         }
     }
 
