@@ -259,22 +259,23 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         String scheme = request.getScheme(); // http 或 https
         String serverName = request.getServerName(); // 域名或 IP
         int serverPort = request.getServerPort(); // 端口
-        String contextPath = request.getContextPath(); // context-path (/example)
 
-        // 构建部署基础 URL（格式：http://域名:端口/context-path）
+        // 构建基础访问域名（不包含 context-path），格式：http://域名:端口
         String deployHost = scheme + "://" + serverName;
         // 只有非标准端口时才添加端口
-        if ((scheme.equals("http") && serverPort != 80) || (scheme.equals("https") && serverPort != 443)) {
+        if (("http".equalsIgnoreCase(scheme) && serverPort != 80)
+                || ("https".equalsIgnoreCase(scheme) && serverPort != 443)) {
             deployHost += ":" + serverPort;
         }
-        deployHost += contextPath;
 
-        // 11. 得到可访问的 URL 地址（对外短链：/{deployKey} -> 301 -> /example/static/{deployKey}/）
-        String appDeployUrl = deployHost + "/" + deployKey;
+        // 11. 统一返回静态部署地址：/dist/{deployKey}/
+        // 说明：前端 Nginx 已将 /dist/ 映射到实际的部署目录 /tmp/code_deploy/{deployKey}，
+        // 因此这里直接返回最终可访问的静态地址，避免再走 /example 短链重定向。
+        String appDeployUrl = deployHost + "/dist/" + deployKey + "/";
+
         // 12. 异步生成截图并且更新应用封面
-        // 这里直接对可访问的静态资源地址 /static/{deployKey}/ 进行截图。
-        String screenshotUrl = deployHost + "/static/" + deployKey + "/";
-        generateAppScreenshotAsync(appId, screenshotUrl);
+        // 直接对最终访问地址进行截图，保持与用户看到的页面一致
+        generateAppScreenshotAsync(appId, appDeployUrl);
         return appDeployUrl;
     }
 

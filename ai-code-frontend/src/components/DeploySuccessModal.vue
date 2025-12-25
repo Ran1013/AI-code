@@ -47,8 +47,25 @@ const visible = computed({
 })
 
 const handleCopyUrl = async () => {
+  const text = props.deployUrl
+  if (!text) {
+    message.error('暂无可复制的链接')
+    return
+  }
+
   try {
-    await navigator.clipboard.writeText(props.deployUrl)
+    // 优先使用新剪贴板 API（仅在安全上下文下可用）
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(text)
+    } else {
+      // 回退方案：创建临时输入框执行复制，兼容 http 环境
+      const input = document.createElement('input')
+      input.value = text
+      document.body.appendChild(input)
+      input.select()
+      document.execCommand('copy')
+      document.body.removeChild(input)
+    }
     message.success('链接已复制到剪贴板')
   } catch (error) {
     console.error('复制失败：', error)

@@ -533,16 +533,20 @@ const connectWebSocket = () => {
   if (!appId.value) return
 
   try {
-    // 构建WebSocket URL
+    // 构建 WebSocket URL
     let wsUrl: string
-    
-    // 在开发环境中，使用当前页面的 host 连接 WebSocket，这样可以通过 Vite 代理
-    if (import.meta.env.DEV) {
-      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-      wsUrl = `${protocol}//${window.location.host}/api/ws/app?appId=${appId.value}`
+
+    // 统一使用当前页面的 host 和协议，确保 WebSocket 连接正确
+    // 这样无论是开发环境还是生产环境，都能正确连接
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+
+    // 如果 API_BASE_URL 是相对路径，使用当前 host；如果是绝对路径，提取域名
+    if (API_BASE_URL.startsWith('/')) {
+      // 相对路径：/api -> ws://current-host/api/ws/app
+      wsUrl = `${protocol}//${window.location.host}${API_BASE_URL}/ws/app?appId=${appId.value}`
     } else {
-      // 生产环境使用配置的 API_BASE_URL
-      wsUrl = API_BASE_URL.replace('http', 'ws') + `/ws/app?appId=${appId.value}`
+      // 绝对路径：http://xxx/api -> ws://xxx/api/ws/app
+      wsUrl = API_BASE_URL.replace(/^https?:/, 'ws:') + `/ws/app?appId=${appId.value}`
     }
     
     console.log('正在连接WebSocket:', wsUrl)
