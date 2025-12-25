@@ -165,8 +165,8 @@ public class AppController {
 
         // 获取当前登录用户
         User loginUser = userService.getLoginUser(request);
-        // 调用服务部署应用
-        String deployUrl = appService.deployApp(appId, loginUser);
+        // 调用服务部署应用（传递 request 用于动态获取域名）
+        String deployUrl = appService.deployApp(appId, loginUser, request);
         return ResultUtils.success(deployUrl);
     }
 

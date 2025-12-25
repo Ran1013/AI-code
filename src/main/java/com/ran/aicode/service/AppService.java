@@ -40,9 +40,10 @@ public interface AppService extends IService<App> {
      *
      * @param appId     应用 ID
      * @param loginUser 当前登录用户（用于鉴权与审计）
+     * @param request   HTTP 请求（用于动态获取访问域名和端口）
      * @return 部署后的应用访问 URL
      */
-    String deployApp(Long appId, User loginUser);
+    String deployApp(Long appId, User loginUser, HttpServletRequest request);
 
     /**
      * 获取应用视图对象
