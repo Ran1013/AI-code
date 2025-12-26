@@ -142,13 +142,46 @@ langchain4j:
       log-responses: false
 
     # 智能路由 AI 模型配置
+    # 用于判断用户需求应该使用哪种代码生成类型（HTML/MULTI_FILE/VUE_PROJECT）
+    # 使用轻量级快速模型，只需返回枚举值，不需要复杂推理
     routing-chat-model:
-      base-url: https://dashscope.aliyuncs.com/compatible-mode/v1
-      api-key: <YOUR_DASHSCOPE_API_KEY>
-      model-name: qwen-turbo
+      base-url: https://api-inference.modelscope.cn/v1
+      api-key: <YOUR_MODELSCOPE_API_KEY>
+      model-name: Qwen/Qwen3-4B
       max-tokens: 100
       log-requests: false
       log-responses: false
+
+      # 多级保底模型配置（可选）
+      # 当主模型调用失败时，会自动切换到次级保底模型，再失败则切换到终极保底模型
+      fallbacks:
+        enabled: false               # 默认关闭，需要时手动开启
+        recovery-interval-minutes: 30
+
+        # 次级保底模型（推荐使用 ModelScope）
+        # 注意：避免使用智谱 GLM 作为非流式模型的保底
+        # 原因：智谱 GLM API 要求非流式调用时 enable_thinking=false，与 LangChain4j 存在兼容性问题
+        secondary:
+          enabled: false
+          base-url: https://api-inference.modelscope.cn/v1
+          api-key: <YOUR_MODELSCOPE_API_KEY>
+          model-name: Qwen/Qwen2.5-Coder-7B-Instruct
+          max-tokens: 128
+          timeout-ms: 30000
+          log-requests: false
+          log-responses: false
+
+        # 终极保底模型（推荐使用 ModelScope）
+        # 注意：避免使用阿里云作为保底，免费额度容易耗尽
+        tertiary:
+          enabled: false
+          base-url: https://api-inference.modelscope.cn/v1
+          api-key: <YOUR_MODELSCOPE_API_KEY>
+          model-name: Qwen/Qwen2.5-Coder-14B-Instruct
+          max-tokens: 128
+          timeout-ms: 60000
+          log-requests: false
+          log-responses: false
 
 # 华为云 OBS 对象存储配置
 obs:
