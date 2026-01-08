@@ -95,6 +95,8 @@ langchain4j:
       #model-name: qwen3-coder-plus
       model-name: qwen-turbo
       max-tokens: 4096
+      # 流式读超时（毫秒）：代码生成 + 工具调用场景建议 >= 600000（10 分钟）
+      timeout-ms: 600000
       log-requests: false
       log-responses: false
 
@@ -136,6 +138,8 @@ langchain4j:
       max-tokens: 8192
     
       temperature: 0.1
+      # 流式读超时（毫秒）：复杂推理/长输出建议 >= 600000（10 分钟）
+      timeout-ms: 600000
       # log-requests: true
       # log-responses: true
       log-requests: false

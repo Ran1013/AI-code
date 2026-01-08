@@ -67,6 +67,32 @@ public class VueProjectBuilder {
     }
 
     /**
+     * 同步构建（带状态）：用于工作流等需要“只构建一次”的场景。
+     *
+     * @param projectPath 项目根目录
+     * @param appId 应用ID
+     * @return 是否构建成功
+     */
+    public boolean buildProjectWithStatus(String projectPath, Long appId) {
+        if (appId != null) {
+            buildStatusMap.put(appId, BuildStatus.BUILDING);
+        }
+        boolean success = false;
+        try {
+            success = buildProject(projectPath);
+        } catch (Exception e) {
+            log.error("同步构建 Vue 项目时发生异常: appId={}, error={}", appId, e.getMessage(), e);
+            success = false;
+        } finally {
+            if (appId != null) {
+                buildStatusMap.put(appId, success ? BuildStatus.SUCCESS : BuildStatus.FAILED);
+                scheduleBuildStatusCleanup(appId);
+            }
+        }
+        return success;
+    }
+
+    /**
      * 异步构建 Vue 项目
      *
      * @param projectPath
@@ -118,17 +144,24 @@ public class VueProjectBuilder {
                         }
                     }
 
-                    // 30分钟后清理状态
-                    Thread.ofVirtual().start(() -> {
-                        try {
-                            Thread.sleep(TimeUnit.MINUTES.toMillis(30));
-                            buildStatusMap.remove(appId);
-                            log.info("已清理过期的构建状态: appId={}", appId);
-                        } catch (InterruptedException e) {
-                            Thread.currentThread().interrupt();
-                        }
-                    });
+                    scheduleBuildStatusCleanup(appId);
                 });
+    }
+
+    private void scheduleBuildStatusCleanup(Long appId) {
+        if (appId == null) {
+            return;
+        }
+        // 30分钟后清理状态
+        Thread.ofVirtual().start(() -> {
+            try {
+                Thread.sleep(TimeUnit.MINUTES.toMillis(30));
+                buildStatusMap.remove(appId);
+                log.info("已清理过期的构建状态: appId={}", appId);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        });
     }
 
     /**

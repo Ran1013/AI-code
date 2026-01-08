@@ -86,6 +86,21 @@ public class AiCodeGeneratorFacade {
      * @return 保存的目录
      */
     public Flux<String> generateAndSaveCodeStream(String userMessage, CodeGenTypeEnum codeGenTypeEnum, Long appId, Long userId) {
+        return generateAndSaveCodeStream(userMessage, codeGenTypeEnum, appId, userId, false);
+    }
+
+    /**
+     * 统一入口：根据类型生成并保存代码（流式）
+     *
+     * @param userMessage     用户提示词
+     * @param codeGenTypeEnum 生成类型
+     * @param appId 应用 ID
+     * @param userId 用户ID
+     * @param skipVueAsyncBuild 是否跳过 Vue 异步构建（工作流内自行构建时使用，避免重复构建并发冲突）
+     * @return 流式响应
+     */
+    public Flux<String> generateAndSaveCodeStream(String userMessage, CodeGenTypeEnum codeGenTypeEnum, Long appId, Long userId,
+                                                  boolean skipVueAsyncBuild) {
         if (codeGenTypeEnum == null) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "生成类型不能为空");
         }
@@ -106,7 +121,7 @@ public class AiCodeGeneratorFacade {
             }
             case VUE_PROJECT -> {
                 TokenStream tokenStream = aiCodeGeneratorService.generateVueProjectCodeStream(appId, userMessage);
-                yield processTokenStream(tokenStream, appId, userId, CodeGenTypeEnum.VUE_PROJECT);
+                yield processTokenStream(tokenStream, appId, userId, CodeGenTypeEnum.VUE_PROJECT, skipVueAsyncBuild);
             }
             default -> {
                 String errorMessage = "不支持的生成类型：" + codeGenTypeEnum.getValue();
@@ -129,7 +144,7 @@ public class AiCodeGeneratorFacade {
         }
         AiCodeGeneratorService aiCodeGeneratorService = aiCodeGeneratorServiceFactory.getAiCodeGeneratorService(appId, codeGenTypeEnum);
         TokenStream tokenStream = aiCodeGeneratorService.generateVueProjectCodeStream(appId, userMessage);
-        return processTokenStreamWithReservation(tokenStream, appId, userId, codeGenTypeEnum, reservationId, estimatedTokens);
+        return processTokenStreamWithReservation(tokenStream, appId, userId, codeGenTypeEnum, reservationId, estimatedTokens, false);
     }
 
     /**
@@ -460,7 +475,8 @@ public class AiCodeGeneratorFacade {
      * @param codeGenType 代码生成类型
      * @return Flux<String> 流式响应
      */
-    private Flux<String> processTokenStream(TokenStream tokenStream, Long appId, Long userId, CodeGenTypeEnum codeGenType) {
+    private Flux<String> processTokenStream(TokenStream tokenStream, Long appId, Long userId, CodeGenTypeEnum codeGenType,
+                                            boolean skipVueAsyncBuild) {
         // 部分内容收集器，用于取消时保存已生成的内容
         StringBuilder partialContentBuilder = new StringBuilder();
         
@@ -522,10 +538,15 @@ public class AiCodeGeneratorFacade {
                         // 根据代码生成类型执行不同的后处理逻辑
                         try {
                             if (codeGenType == CodeGenTypeEnum.VUE_PROJECT) {
-                                // Vue项目异步构建，避免阻塞流式响应
-                                String projectPath = AppConstant.CODE_OUTPUT_ROOT_DIR + "/vue_project_" + appId;
-                                vueProjectBuilder.buildProjectAsync(projectPath, appId, userId);
-                                log.info("Vue项目构建已启动（异步）: {}", projectPath);
+                                // Vue 项目默认异步构建，避免阻塞流式响应；
+                                // 但工作流内会有专门的构建节点，此处需要跳过，避免同目录重复构建导致 npm 并发冲突。
+                                if (!skipVueAsyncBuild) {
+                                    String projectPath = AppConstant.CODE_OUTPUT_ROOT_DIR + "/vue_project_" + appId;
+                                    vueProjectBuilder.buildProjectAsync(projectPath, appId, userId);
+                                    log.info("Vue项目构建已启动（异步）: {}", projectPath);
+                                } else {
+                                    log.info("已跳过 Vue 异步构建（由工作流构建节点负责）: appId={}", appId);
+                                }
                             } else if (codeGenType == CodeGenTypeEnum.HTML || codeGenType == CodeGenTypeEnum.MULTI_FILE) {
                                 // HTML和MULTI_FILE类型的代码保存
                                 String completeCode = partialContentBuilder.toString();
@@ -558,7 +579,7 @@ public class AiCodeGeneratorFacade {
      */
     private Flux<String> processTokenStreamWithReservation(TokenStream tokenStream, Long appId, Long userId,
                                                            CodeGenTypeEnum codeGenType, String reservationId,
-                                                           long estimatedTokens) {
+                                                           long estimatedTokens, boolean skipVueAsyncBuild) {
         StringBuilder partialContentBuilder = new StringBuilder();
         return Flux.create((FluxSink<String> sink) -> {
             Disposable disposable = Flux.never().subscribe();
@@ -617,9 +638,13 @@ public class AiCodeGeneratorFacade {
                         // 后处理，与通用一致
                         try {
                             if (codeGenType == CodeGenTypeEnum.VUE_PROJECT) {
-                                String projectPath = AppConstant.CODE_OUTPUT_ROOT_DIR + "/vue_project_" + appId;
-                                vueProjectBuilder.buildProjectAsync(projectPath, appId, userId);
-                                log.info("Vue项目构建已启动（异步）: {}", projectPath);
+                                if (!skipVueAsyncBuild) {
+                                    String projectPath = AppConstant.CODE_OUTPUT_ROOT_DIR + "/vue_project_" + appId;
+                                    vueProjectBuilder.buildProjectAsync(projectPath, appId, userId);
+                                    log.info("Vue项目构建已启动（异步）: {}", projectPath);
+                                } else {
+                                    log.info("已跳过 Vue 异步构建（预占链路）: appId={}", appId);
+                                }
                             }
                         } catch (Exception e) {
                             log.error("代码保存失败: {}", e.getMessage());
