@@ -26,7 +26,7 @@ import com.github.benmanes.caffeine.cache.Caffeine;
 @Slf4j
 public class AiCodeGeneratorServiceFactory {
 
-    @Resource(name = "openAiChatModel")
+    @Resource(name = "multiFallbackOpenAiChatModel")
     private ChatModel chatModel;
 
     @Resource

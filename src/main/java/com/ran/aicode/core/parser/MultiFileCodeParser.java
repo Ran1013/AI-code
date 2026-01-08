@@ -1,5 +1,6 @@
 package com.ran.aicode.core.parser;
 
+import cn.hutool.core.util.StrUtil;
 import com.ran.aicode.ai.model.MultiFileCodeResult;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -32,6 +33,16 @@ public class MultiFileCodeParser implements CodeParser<MultiFileCodeResult> {
         if (jsCode != null && !jsCode.trim().isEmpty()) {
             result.setJsCode(jsCode.trim());
         }
+
+        // 兜底：如果没能从代码块中提取 HTML，但整体内容看起来像 HTML，就用整个内容兜底
+        if (StrUtil.isBlank(result.getHtmlCode())) {
+            String trimmed = codeContent != null ? codeContent.trim() : "";
+            String lower = trimmed.toLowerCase();
+            if (lower.contains("<html") || lower.contains("<!doctype html")) {
+                result.setHtmlCode(trimmed);
+            }
+        }
+
         return result;
     }
 

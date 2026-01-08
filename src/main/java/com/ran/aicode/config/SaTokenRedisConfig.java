@@ -73,7 +73,7 @@ public class SaTokenRedisConfig implements WebMvcConfigurer {
                             .setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
                             .setHeader("Access-Control-Allow-Headers", "*")
                             .setHeader("Access-Control-Allow-Credentials", "true");
-                    
+
                     // 如果是预检请求，直接返回
                     if ("OPTIONS".equals(SaHolder.getRequest().getMethod())) {
                         SaRouter.stop();

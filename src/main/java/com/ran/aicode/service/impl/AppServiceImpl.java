@@ -193,7 +193,7 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
 
 
     @Override
-    public String deployApp(Long appId, User loginUser) {
+    public String deployApp(Long appId, User loginUser, HttpServletRequest request) {
         // 1. 参数校验
         ThrowUtils.throwIf(appId == null || appId <= 0, ErrorCode.PARAMS_ERROR, "应用 ID 错误");
         ThrowUtils.throwIf(loginUser == null, ErrorCode.NOT_LOGIN_ERROR, "用户未登录");
@@ -254,13 +254,28 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         updateApp.setDeployedTime(LocalDateTime.now());
         boolean updateResult = this.updateById(updateApp);
         ThrowUtils.throwIf(!updateResult, ErrorCode.OPERATION_ERROR, "更新应用部署信息失败");
-        // 10. 得到可访问的 URL 地址（对外短链：/{deployKey} -> 301 -> /example/static/{deployKey}/）
-        String appDeployUrl = String.format("%s/%s", AppConstant.CODE_DEPLOY_HOST, deployKey);
-        // 11. 异步生成截图并且更新应用封面
-        // 说明：/inner/screenshot/{deployKey} 在当前工程中未实现，会导致 404（Whitelabel Error Page），截图内容错误。
-        // 这里直接对可访问的静态资源地址 /static/{deployKey}/ 进行截图。
-        String screenshotUrl = String.format("%s/static/%s/", AppConstant.CODE_DEPLOY_HOST, deployKey);
-        generateAppScreenshotAsync(appId, screenshotUrl);
+
+        // 10. 动态获取部署域名（从请求中获取，支持内网穿透、多域名等场景）
+        String scheme = request.getScheme(); // http 或 https
+        String serverName = request.getServerName(); // 域名或 IP
+        int serverPort = request.getServerPort(); // 端口
+
+        // 构建基础访问域名（不包含 context-path），格式：http://域名:端口
+        String deployHost = scheme + "://" + serverName;
+        // 只有非标准端口时才添加端口
+        if (("http".equalsIgnoreCase(scheme) && serverPort != 80)
+                || ("https".equalsIgnoreCase(scheme) && serverPort != 443)) {
+            deployHost += ":" + serverPort;
+        }
+
+        // 11. 统一返回静态部署地址：/dist/{deployKey}/
+        // 说明：前端 Nginx 已将 /dist/ 映射到实际的部署目录 /tmp/code_deploy/{deployKey}，
+        // 因此这里直接返回最终可访问的静态地址，避免再走 /example 短链重定向。
+        String appDeployUrl = deployHost + "/dist/" + deployKey + "/";
+
+        // 12. 异步生成截图并且更新应用封面
+        // 直接对最终访问地址进行截图，保持与用户看到的页面一致
+        generateAppScreenshotAsync(appId, appDeployUrl);
         return appDeployUrl;
     }
 

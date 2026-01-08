@@ -11,6 +11,8 @@ import dev.langchain4j.model.openai.internal.completion.CompletionResponse;
 import dev.langchain4j.model.openai.internal.shared.Usage;
 import dev.langchain4j.model.output.FinishReason;
 import dev.langchain4j.model.output.TokenUsage;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.List;
 import java.util.Map;
@@ -31,6 +33,8 @@ import static java.util.stream.Collectors.toList;
  */
 @Internal
 public class OpenAiStreamingResponseBuilder {
+
+    private static final Logger log = LoggerFactory.getLogger(OpenAiStreamingResponseBuilder.class);
 
     private final StringBuffer contentBuilder = new StringBuffer();
 
@@ -110,15 +114,12 @@ public class OpenAiStreamingResponseBuilder {
             }
         }
 
-        if (delta.toolCalls() != null) {
-            System.out.println("=== 工具调用流式数据 ===");
-            System.out.println("工具调用详情: " + delta.toolCalls());
+        if (delta.toolCalls() != null && !delta.toolCalls().isEmpty()) {
+            if (log.isTraceEnabled()) {
+                log.trace("收到 tool_calls delta，数量={}", delta.toolCalls().size());
+            }
 
             for (ToolCall toolCall : delta.toolCalls()) {
-                System.out.println("处理工具调用: index=" + toolCall.index() + 
-                    ", id=" + toolCall.id() + 
-                    ", function=" + toolCall.function());
-
                 ToolExecutionRequestBuilder builder = this.indexToToolExecutionRequestBuilder.computeIfAbsent(
                         toolCall.index(),
                         idx -> new ToolExecutionRequestBuilder()
@@ -126,18 +127,19 @@ public class OpenAiStreamingResponseBuilder {
 
                 if (toolCall.id() != null) {
                     builder.idBuilder.append(toolCall.id());
-                    System.out.println("累积ID: " + builder.idBuilder.toString());
                 }
 
                 FunctionCall functionCall = toolCall.function();
+                if (functionCall == null) {
+                    continue;
+                }
+
                 if (functionCall.name() != null) {
                     builder.nameBuilder.append(functionCall.name());
-                    System.out.println("累积名称: " + builder.nameBuilder.toString());
                 }
 
                 if (functionCall.arguments() != null) {
                     builder.argumentsBuilder.append(functionCall.arguments());
-                    System.out.println("累积参数: " + builder.argumentsBuilder.toString());
                 }
             }
         }
@@ -206,15 +208,16 @@ public class OpenAiStreamingResponseBuilder {
         }
 
         if (!indexToToolExecutionRequestBuilder.isEmpty()) {
-            System.out.println("构建工具调用请求，数量: " + indexToToolExecutionRequestBuilder.size());
-            
+            if (log.isDebugEnabled()) {
+                log.debug("构建 tool_calls 请求，数量={}", indexToToolExecutionRequestBuilder.size());
+            }
+
             List<ToolExecutionRequest> toolExecutionRequests = indexToToolExecutionRequestBuilder.values().stream()
                     .map(it -> {
                         String id = it.idBuilder.toString();
                         String name = it.nameBuilder.toString();
                         String arguments = it.argumentsBuilder.toString();
-                        System.out.println("工具调用: id=" + id + ", name=" + name + ", arguments=" + arguments);
-                        
+
                         return ToolExecutionRequest.builder()
                                 .id(id)
                                 .name(name)

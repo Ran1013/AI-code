@@ -50,7 +50,8 @@ public class OpenAiStreamingChatModel implements StreamingChatModel {
                 .organizationId(builder.organizationId)
                 .projectId(builder.projectId)
                 .connectTimeout(getOrDefault(builder.timeout, ofSeconds(15)))
-                .readTimeout(getOrDefault(builder.timeout, ofSeconds(60)))
+                // 默认 60s 对于代码生成/工具调用场景过短，容易触发 SocketTimeoutException: Read timed out
+                .readTimeout(getOrDefault(builder.timeout, ofSeconds(600)))
                 .logRequests(getOrDefault(builder.logRequests, false))
                 .logResponses(getOrDefault(builder.logResponses, false))
                 .userAgent(DEFAULT_USER_AGENT)

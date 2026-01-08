@@ -3,7 +3,9 @@
  */
 
 // 应用部署域名
-export const DEPLOY_DOMAIN = import.meta.env.VITE_DEPLOY_DOMAIN || 'http://localhost'
+export const DEPLOY_DOMAIN =
+  import.meta.env.VITE_DEPLOY_DOMAIN ||
+  (typeof window !== 'undefined' ? window.location.origin : 'http://localhost')
 
 // API 基础地址
 // 开发环境走 Vite 代理，统一使用相对前缀 /api，避免直连端口导致跨域或端口不匹配
@@ -15,8 +17,14 @@ export const STATIC_BASE_URL = `${API_BASE_URL}/static`
 
 // 获取部署应用的完整URL
 export const getDeployUrl = (deployKey: string) => {
- // return `${DEPLOY_DOMAIN}/${deployKey}`
-  return `${API_BASE_URL}/static/${deployKey}/`
+  // 开发环境：走后端静态资源接口（Vite 代理 /api）
+  if ((import.meta as any).env?.DEV) {
+    return `${API_BASE_URL}/static/${deployKey}/`
+  }
+
+  // 线上部署：Nginx 将 `/dist/` 映射到部署目录 `/tmp/code_deploy/{deployKey}`
+  // 直接返回相对路径，自动适配 v4/v6/端口，且不会出现 /dist/dist
+  return `/dist/${deployKey}/`
 }
 
 // 获取静态资源预览URL

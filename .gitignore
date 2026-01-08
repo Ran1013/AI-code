@@ -5,7 +5,9 @@
 ### CUSTOM ###
 tmp
 application-prod.yml
-
+application-h.yml
+application-h2.yml
+application-prod123.yml
 # User-specific stuff
 .idea/**/workspace.xml
 .idea/**/tasks.xml
@@ -82,6 +84,10 @@ fabric.properties
 .idea/caches/build_file_checksums.ser
 
 
+/.idea/
+/.vscode/
+/target/
+node_modules/
 /.idea/
 /.vscode/
 /target/

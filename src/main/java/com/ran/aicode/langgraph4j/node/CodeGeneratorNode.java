@@ -34,7 +34,16 @@ public class CodeGeneratorNode {
             log.info("开始生成代码，类型: {} ({})", generationType.getValue(), generationType.getText());
             // 先使用固定的 appId (后续再整合到业务中)
             // 调用流式代码生成
-            Flux<String> codeStream = codeGeneratorFacade.generateAndSaveCodeStream(userMessage, generationType, context.getAppId(),context.getUserId());
+            Flux<String> codeStream;
+            if (generationType == CodeGenTypeEnum.VUE_PROJECT) {
+                // 工作流内会有专门的「项目构建」节点，这里必须跳过异步构建，
+                // 避免同一目录被重复触发 npm install/build 导致并发冲突与不稳定。
+                codeStream = codeGeneratorFacade.generateAndSaveCodeStream(
+                        userMessage, generationType, context.getAppId(), context.getUserId(), true);
+            } else {
+                codeStream = codeGeneratorFacade.generateAndSaveCodeStream(
+                        userMessage, generationType, context.getAppId(), context.getUserId());
+            }
             // 同步等待流式输出完成
             codeStream.blockLast(Duration.ofMinutes(10)); // 最多等待 10 分钟
             // 根据类型设置生成目录

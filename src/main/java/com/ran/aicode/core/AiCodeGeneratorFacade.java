@@ -86,6 +86,21 @@ public class AiCodeGeneratorFacade {
      * @return 保存的目录
      */
     public Flux<String> generateAndSaveCodeStream(String userMessage, CodeGenTypeEnum codeGenTypeEnum, Long appId, Long userId) {
+        return generateAndSaveCodeStream(userMessage, codeGenTypeEnum, appId, userId, false);
+    }
+
+    /**
+     * 统一入口：根据类型生成并保存代码（流式）
+     *
+     * @param userMessage     用户提示词
+     * @param codeGenTypeEnum 生成类型
+     * @param appId 应用 ID
+     * @param userId 用户ID
+     * @param skipVueAsyncBuild 是否跳过 Vue 异步构建（工作流内自行构建时使用，避免重复构建并发冲突）
+     * @return 流式响应
+     */
+    public Flux<String> generateAndSaveCodeStream(String userMessage, CodeGenTypeEnum codeGenTypeEnum, Long appId, Long userId,
+                                                  boolean skipVueAsyncBuild) {
         if (codeGenTypeEnum == null) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "生成类型不能为空");
         }
@@ -102,12 +117,11 @@ public class AiCodeGeneratorFacade {
                 yield generateHtmlWithRetryStream(aiCodeGeneratorService, userMessage, appId, userId);
             }
             case MULTI_FILE -> {
-                TokenStream tokenStream = aiCodeGeneratorService.generateMultiFileCodeStream(appId, userMessage);
-                yield processTokenStreamForSimpleText(tokenStream, appId, userId, CodeGenTypeEnum.MULTI_FILE);
+                yield generateMultiFileWithRetryStream(aiCodeGeneratorService, userMessage, appId, userId);
             }
             case VUE_PROJECT -> {
                 TokenStream tokenStream = aiCodeGeneratorService.generateVueProjectCodeStream(appId, userMessage);
-                yield processTokenStream(tokenStream, appId, userId, CodeGenTypeEnum.VUE_PROJECT);
+                yield processTokenStream(tokenStream, appId, userId, CodeGenTypeEnum.VUE_PROJECT, skipVueAsyncBuild);
             }
             default -> {
                 String errorMessage = "不支持的生成类型：" + codeGenTypeEnum.getValue();
@@ -130,7 +144,7 @@ public class AiCodeGeneratorFacade {
         }
         AiCodeGeneratorService aiCodeGeneratorService = aiCodeGeneratorServiceFactory.getAiCodeGeneratorService(appId, codeGenTypeEnum);
         TokenStream tokenStream = aiCodeGeneratorService.generateVueProjectCodeStream(appId, userMessage);
-        return processTokenStreamWithReservation(tokenStream, appId, userId, codeGenTypeEnum, reservationId, estimatedTokens);
+        return processTokenStreamWithReservation(tokenStream, appId, userId, codeGenTypeEnum, reservationId, estimatedTokens, false);
     }
 
     /**
@@ -238,6 +252,13 @@ public class AiCodeGeneratorFacade {
             "2) 代码必须包含 <!DOCTYPE html> 或 <html>，并且是完整可运行的单文件页面。\n" +
             "3) 代码块之外禁止输出任何解释、清单、说明文字。\n";
 
+    private static final String MULTI_FILE_RETRY_APPEND_PROMPT = "\n\n" +
+            "【严格输出要求 - 多文件模式】\n" +
+            "1) 必须严格输出 3 个代码块，顺序固定为：```html```、```css```、```javascript```。\n" +
+            "2) 每种语言只能有 1 个代码块，且代码块中必须包含完整文件内容。\n" +
+            "3) 代码块外可以有少量说明文字，但代码块标签必须严格是 ```html / ```css / ```javascript。\n" +
+            "4) 如果无法完全生成 CSS 或 JS，也要输出最小可运行的占位代码，HTML 代码块必须始终存在。\n";
+
     /**
      * HTML 模式：失败自动重试一次。
      */
@@ -340,6 +361,112 @@ public class AiCodeGeneratorFacade {
     }
 
     /**
+     * MULTI_FILE 模式：失败自动重试一次。
+     */
+    private Flux<String> generateMultiFileWithRetryStream(
+            AiCodeGeneratorService aiCodeGeneratorService,
+            String userMessage,
+            Long appId,
+            Long userId) {
+
+        TokenStream first = aiCodeGeneratorService.generateMultiFileCodeStream(appId, userMessage);
+        return processMultiFileTokenStreamWithRetry(first, aiCodeGeneratorService, userMessage, appId, userId, false);
+    }
+
+    private Flux<String> processMultiFileTokenStreamWithRetry(TokenStream tokenStream,
+                                                               AiCodeGeneratorService aiCodeGeneratorService,
+                                                               String originalUserMessage,
+                                                               Long appId,
+                                                               Long userId,
+                                                               boolean isRetry) {
+        StringBuilder partialContentBuilder = new StringBuilder();
+        CodeGenTypeEnum codeGenType = CodeGenTypeEnum.MULTI_FILE;
+
+        return Flux.create((FluxSink<String> sink) -> {
+            Disposable disposable = Flux.never().subscribe();
+            generationTaskManager.registerTask(appId, codeGenType.getValue(), disposable, sink, userId, partialContentBuilder);
+
+            tokenStream.onPartialResponse((String partialResponse) -> {
+                        partialContentBuilder.append(partialResponse);
+                        sink.next(partialResponse);
+                    })
+                    .onPartialToolExecutionRequest((index, toolExecutionRequest) -> {
+                        log.debug("忽略工具调用请求: {}", toolExecutionRequest.name());
+                    })
+                    .onToolExecuted((ToolExecution toolExecution) -> {
+                        log.debug("忽略工具执行结果: {}", toolExecution.request().name());
+                    })
+                    .onCompleteResponse((ChatResponse response) -> {
+                        if (response == null) {
+                            log.warn("收到空的完整响应，跳过处理");
+                            generationTaskManager.completeTask(appId);
+                            sink.complete();
+                            return;
+                        }
+
+                        // 统计并更新用户token消耗（保持与原逻辑一致）
+                        try {
+                            dev.langchain4j.model.output.TokenUsage tokenUsage = response.metadata().tokenUsage();
+                            if (tokenUsage != null) {
+                                Long inputTokens = tokenUsage.inputTokenCount() != null ? tokenUsage.inputTokenCount() : 0L;
+                                Long outputTokens = tokenUsage.outputTokenCount() != null ? tokenUsage.outputTokenCount() : 0L;
+                                Long consumedTokens = inputTokens + outputTokens;
+                                if (consumedTokens > 0) {
+                                    boolean success = tokenService.consumeTokens(userId, consumedTokens);
+                                    if (success) {
+                                        log.info("用户 {} 消耗token成功，消耗: {}", userId, consumedTokens);
+                                    } else {
+                                        log.warn("用户 {} 消耗token失败，消耗: {}", userId, consumedTokens);
+                                    }
+                                }
+                            }
+                        } catch (Exception e) {
+                            log.error("统计用户token消耗失败: userId={}, error={}", userId, e.getMessage(), e);
+                        }
+
+                        String completeCode = partialContentBuilder.toString();
+                        if (completeCode != null && !completeCode.trim().isEmpty()) {
+                            try {
+                                Object parsedResult = CodeParserExecutor.executeParser(completeCode, codeGenType);
+                                File saveDir = CodeFileSaverExecutor.executeSaver(parsedResult, codeGenType, appId);
+                                log.info("保存成功，目录为：{}", saveDir.getAbsolutePath());
+
+                                generationTaskManager.completeTask(appId);
+                                sink.complete();
+                                return;
+                            } catch (BusinessException e) {
+                                if (!isRetry) {
+                                    log.warn("MULTI_FILE 解析失败，准备重试一次: appId={}, error={}", appId, e.getMessage());
+                                    generationTaskManager.completeTask(appId);
+
+                                    String retryMessage = originalUserMessage + MULTI_FILE_RETRY_APPEND_PROMPT;
+                                    TokenStream retryStream = aiCodeGeneratorService.generateMultiFileCodeStream(appId, retryMessage);
+
+                                    processMultiFileTokenStreamWithRetry(
+                                            retryStream, aiCodeGeneratorService,
+                                            originalUserMessage, appId, userId, true)
+                                            .subscribe(sink::next, sink::error, sink::complete);
+                                    return;
+                                }
+                                // 二次失败，再把错误透传
+                                generationTaskManager.completeTask(appId);
+                                sink.error(e);
+                                return;
+                            }
+                        }
+
+                        generationTaskManager.completeTask(appId);
+                        sink.complete();
+                    })
+                    .onError((Throwable error) -> {
+                        generationTaskManager.completeTask(appId);
+                        sink.error(error);
+                    })
+                    .start();
+        });
+    }
+
+    /**
      * 将 TokenStream 转换为 Flux<String>，并传递工具调用信息
      *
      * @param tokenStream TokenStream 对象
@@ -348,7 +475,8 @@ public class AiCodeGeneratorFacade {
      * @param codeGenType 代码生成类型
      * @return Flux<String> 流式响应
      */
-    private Flux<String> processTokenStream(TokenStream tokenStream, Long appId, Long userId, CodeGenTypeEnum codeGenType) {
+    private Flux<String> processTokenStream(TokenStream tokenStream, Long appId, Long userId, CodeGenTypeEnum codeGenType,
+                                            boolean skipVueAsyncBuild) {
         // 部分内容收集器，用于取消时保存已生成的内容
         StringBuilder partialContentBuilder = new StringBuilder();
         
@@ -410,10 +538,15 @@ public class AiCodeGeneratorFacade {
                         // 根据代码生成类型执行不同的后处理逻辑
                         try {
                             if (codeGenType == CodeGenTypeEnum.VUE_PROJECT) {
-                                // Vue项目异步构建，避免阻塞流式响应
-                                String projectPath = AppConstant.CODE_OUTPUT_ROOT_DIR + "/vue_project_" + appId;
-                                vueProjectBuilder.buildProjectAsync(projectPath, appId, userId);
-                                log.info("Vue项目构建已启动（异步）: {}", projectPath);
+                                // Vue 项目默认异步构建，避免阻塞流式响应；
+                                // 但工作流内会有专门的构建节点，此处需要跳过，避免同目录重复构建导致 npm 并发冲突。
+                                if (!skipVueAsyncBuild) {
+                                    String projectPath = AppConstant.CODE_OUTPUT_ROOT_DIR + "/vue_project_" + appId;
+                                    vueProjectBuilder.buildProjectAsync(projectPath, appId, userId);
+                                    log.info("Vue项目构建已启动（异步）: {}", projectPath);
+                                } else {
+                                    log.info("已跳过 Vue 异步构建（由工作流构建节点负责）: appId={}", appId);
+                                }
                             } else if (codeGenType == CodeGenTypeEnum.HTML || codeGenType == CodeGenTypeEnum.MULTI_FILE) {
                                 // HTML和MULTI_FILE类型的代码保存
                                 String completeCode = partialContentBuilder.toString();
@@ -446,7 +579,7 @@ public class AiCodeGeneratorFacade {
      */
     private Flux<String> processTokenStreamWithReservation(TokenStream tokenStream, Long appId, Long userId,
                                                            CodeGenTypeEnum codeGenType, String reservationId,
-                                                           long estimatedTokens) {
+                                                           long estimatedTokens, boolean skipVueAsyncBuild) {
         StringBuilder partialContentBuilder = new StringBuilder();
         return Flux.create((FluxSink<String> sink) -> {
             Disposable disposable = Flux.never().subscribe();
@@ -505,9 +638,13 @@ public class AiCodeGeneratorFacade {
                         // 后处理，与通用一致
                         try {
                             if (codeGenType == CodeGenTypeEnum.VUE_PROJECT) {
-                                String projectPath = AppConstant.CODE_OUTPUT_ROOT_DIR + "/vue_project_" + appId;
-                                vueProjectBuilder.buildProjectAsync(projectPath, appId, userId);
-                                log.info("Vue项目构建已启动（异步）: {}", projectPath);
+                                if (!skipVueAsyncBuild) {
+                                    String projectPath = AppConstant.CODE_OUTPUT_ROOT_DIR + "/vue_project_" + appId;
+                                    vueProjectBuilder.buildProjectAsync(projectPath, appId, userId);
+                                    log.info("Vue项目构建已启动（异步）: {}", projectPath);
+                                } else {
+                                    log.info("已跳过 Vue 异步构建（预占链路）: appId={}", appId);
+                                }
                             }
                         } catch (Exception e) {
                             log.error("代码保存失败: {}", e.getMessage());
