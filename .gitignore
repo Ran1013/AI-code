@@ -86,6 +86,11 @@ fabric.properties
 /.vscode/
 /target/
 node_modules/
-!/.claude/
-!/ai-code-frontend/dist/
-!/ai-code-frontend/node_modules/
+dist/
+ai-code-frontend/dist/
+ai-code-frontend/node_modules/
+*.env
+*.env.local
+*.env.*.local
+application-prod.yml
+application-local.yml

@@ -15,7 +15,7 @@ spring:
     redis:
       host: localhost
       port: 6379
-      password:
+      password: ${REDIS_PASSWORD:}
       database: 0
       ttl: 3600
   session:
@@ -24,9 +24,9 @@ spring:
   mail:
     host: smtp.qq.com
     port: 465
-    username: your-qq-email@qq.com
-    password: <YOUR_EMAIL_SMTP_PASSWORD>
-    from: your-qq-email@qq.com
+    username: ${MAIL_USERNAME:your-qq-email@qq.com}
+    password: ${MAIL_PASSWORD:<YOUR_EMAIL_SMTP_PASSWORD>}
+    from: ${MAIL_FROM:your-qq-email@qq.com}
     fromName: AI代码生成平台
     properties:
       mail:
@@ -57,14 +57,14 @@ langchain4j:
   open-ai:
     chat-model:
       base-url: https://api.siliconflow.cn/v1/chat/completions
-      api-key: <YOUR_SILICONFLOW_API_KEY>
+      api-key: ${SILICONFLOW_API_KEY:your_api_key}
       model-name: deepseek-ai/DeepSeek-V3.1
       log-requests: true
       log-responses: true
     # 推理 AI 模型配置（用于复杂的推理任务）
     reasoning-streaming-chat-model:
       base-url: https://api.siliconflow.cn/v1/chat/completions
-      api-key: <YOUR_SILICONFLOW_API_KEY>
+      api-key: ${SILICONFLOW_API_KEY:your_api_key}
       model-name: Pro/deepseek-ai/DeepSeek-V3.1
       max-tokens: 32768
       temperature: 0.1
@@ -73,7 +73,7 @@ langchain4j:
     # 智能路由 AI 模型配置（用于简单的分类任务）
     routing-chat-model:
       base-url: https://dashscope.aliyuncs.com/compatible-mode/v1
-      api-key: <YOUR_DASHSCOPE_API_KEY>
+      api-key: ${DASHSCOPE_API_KEY:your_api_key}
       model-name: qwen-turbo
       log-requests: true
       log-responses: true
@@ -91,11 +91,11 @@ langchain4j:
 # 添加 OBS 对象存储配置（需要从华为云获取）
 obs:
   client:
-    endpoint:  https://obs.cn-north-4.myhuaweicloud.com  # 华为云OBS endpoint，如https://obs.cn-north-4.myhuaweicloud.com
-    accessKey: <YOUR_OBS_ACCESS_KEY>    # 华为云访问密钥AK
-    secretKey: <YOUR_OBS_SECRET_KEY>    # 华为云访问密钥SK
-    bucket: your-obs-bucket      # OBS桶名
-    region: cn-north-4           # 区域，如cn-north-4
+    endpoint: https://obs.cn-north-4.myhuaweicloud.com  # 华为云OBS endpoint
+    accessKey: ${OBS_ACCESS_KEY:your_access_key}       # 华为云访问密钥AK
+    secretKey: ${OBS_SECRET_KEY:your_secret_key}       # 华为云访问密钥SK
+    bucket: ${OBS_BUCKET_NAME:your_bucket}             # OBS桶名
+    region: cn-north-4                                 # 区域，如cn-north-4
 
 # Sa-Token 配置
 sa-token:
