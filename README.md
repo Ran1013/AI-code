@@ -341,7 +341,7 @@ sequenceDiagram
 - **Node.js**: 16+
 - **MySQL**: 8.0+
 - **Redis**: 6.0+
-- **浏览器**: Edge（网页截图功能）
+- **浏览器**: Chrome（网页截图功能）
 
 ### HotKey 依赖安装（必须）
 
@@ -372,7 +372,7 @@ mvn install:install-file ^
 
 ```bash
 # 1. 克隆项目
-git clone <repository-url>
+git clone https://github.com/Ran1013/AI-code.git
 cd ai-code
 
 # 2. 配置数据库和Redis连接
@@ -440,35 +440,7 @@ npm run dev
 
 ## 🖼️ 界面预览
 
-> 以下为平台主要页面的实际效果截图（均为相对路径 `image/` 下的资源）。
-
-### 首页
-
-![首页](image/首页.png)
-
-### 推荐页
-
-![推荐页](image/推荐页.png)
-
-### 对话页
-
-![对话页](image/对话页.png)
-
-### 协同开发
-
-![协同开发](image/协同开发.png)
-
-### 应用管理页面
-
-![应用管理页面](image/应用管理页面.png)
-
-### 用户管理页面
-
-![用户管理页面](image/用户管理页面.png)
-
-### 个人信息页
-
-![个人信息页](image/个人信息页.png)
+> 💡 **说明**：平台新版界面正在持续迭代优化中，最新界面截图与演示视频将在后续版本发布时同步上线，敬请期待！
 
 ## 🔧 开发文档
 
@@ -727,5 +699,4 @@ POST /screenshot/generate  # 手动生成截图
 **AI Code - 让AI代码生成更智能，让团队开发更高效！** 🚀
 
 [⬆ 回到顶部](#ai-code---智能代码生成平台)
-![img.png](img.png)
 </div>
